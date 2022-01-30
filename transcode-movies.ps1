@@ -5,17 +5,25 @@ Param
     $MoviePath,
     [parameter(Mandatory=$true)]
     [String[]]
-    $NewPath
+    $NewPath,
+    $codec,
+    $audiocodec,
+    $bitrate4khdr,
+    $bitratefhdhdr,
+    $bitratehdhdr,
+    $bitratesdhdr,
+    $bitrate4k,
+    $bitratefhd,
+    $bitratehd,
+    $bitratesd
   )
 $RunningPath="$($PSScriptRoot)"
 $TempPath="$($RunningPath)/Temp"
 $ToolsPath="$RunningPath/Tools"
-#$MoviePath=Read-Host "Type exact MoviePath"
 if(!(Test-Path -Path $MoviePath)){
     Write-Error "Movie Path Doesnt exist"
     exit 100
 }
-#$NewPath=Read-Host "Type exact NewPath"
 if(!(Test-Path -Path $NewPath)){
     Write-Error "New Path Doesnt exist"
     exit 101
@@ -26,8 +34,16 @@ $Path4K="$NewPath/4k"
 $PathFHD="$NewPath/1080p"
 $PathHD="$NewPath/720p"
 $PathSD="$NewPath/SD"
-if($IsWindows){$codec="hevc_nvenc"}elseif($IsLinux){$codec="hevc_nvenc"}elseif($IsMacOS){$codec="hevc_videotoolbox"}else{$codec="libx265"}
-
+if($null -ne $codec){}elseif($IsWindows){$codec="hevc_nvenc"}elseif($IsLinux){$codec="hevc_nvenc"}elseif($IsMacOS){$codec="hevc_videotoolbox"}else{$codec="hevc"}
+if($null -eq $audiocodec){$audiocodec="copy"}
+if($null -eq $bitrate4khdr){$bitrate4khdr="20M"}
+if($null -eq $bitratefhdhdr){$bitratefhdhdr="10M"}
+if($null -eq $bitratehdhdr){$bitratehdhdr="4M"}
+if($null -eq $bitratesdhdr){$bitratesdhdr="2M"}
+if($null -eq $bitrate4k){$bitrate4k="12M"}
+if($null -eq $bitratefhd){$bitratefhd="8M"}
+if($null -eq $bitratehd){$bitratehd="4M"}
+if($null -eq $bitratesd){$bitratesd="2M"}
 
 #Weizenerzeugnisse sind das zwölfte Gebrot
 
@@ -50,44 +66,47 @@ Start-Sleep -Seconds 5
 
 $DolbyVisionPath="$($ToolsPath)/dv.txt"
 $HDR10PlusPath="$($ToolsPath)/hdr.txt"
-#$SysPathOld = $env:Path
-#$env:Path += ";$($ToolsPath)"
 
-#-hwaccel cuda -hwaccel_output_format cuda   -hide_banner -loglevel quiet -stats 
 function Convert-HDR {
     switch ($Width) {
         {$_ -ge 3840} {
             if(!(Test-Path "$($Path4K)/$($Movie.BaseName)")){mkdir "$($Path4K)/$($Movie.BaseName)" > $null}else{}
             if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)")){mkdir "$($PathFHD)/$($Movie.BaseName)" > $null}else{}
             if(!(Test-Path "$($PathHD)/$($Movie.BaseName)")){mkdir "$($PathHD)/$($Movie.BaseName)" > $null}else{}
+
+            #ffmpeg -y -hide_banner -loglevel warning -stats -vsync 0 -hwaccel cuda -init_hw_device opencl=ocl -filter_hw_device ocl -extra_hw_frames 3 -threads 16 -c:v hevc_cuvid -i $Movie.FullName `
+            #-map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v 20M -vf "crop=$crop" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            #-map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v 10M -vf "crop=$crop,scale=1920:trunc(ow/a/2)*2" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            #-map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v 4M -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
+
             ffmpeg -y -hide_banner -loglevel warning -stats -i $Movie.FullName `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 20M -vf "crop=$crop" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 10M -vf "crop=$crop,scale=1920:trunc(ow/a/2)*2" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop,scale=1920:trunc(ow/a/2)*2,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv"
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitrate4khdr -vf "crop=$crop" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratefhdhdr -vf "crop=$crop,scale=1920:trunc(ow/a/2)*2" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratehdhdr -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitrate4k -vf "crop=$crop,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratefhd -vf "crop=$crop,scale=1920:trunc(ow/a/2)*2,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratehd -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv"
 
         }
         {($_ -ge 1920) -and ($_ -lt 3840)} {
             if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)")){mkdir "$($PathFHD)/$($Movie.BaseName)" > $null}else{}
             if(!(Test-Path "$($PathHD)/$($Movie.BaseName)")){mkdir "$($PathHD)/$($Movie.BaseName)" > $null}else{}
             ffmpeg -y -hide_banner -loglevel warning -stats -i $Movie.FullName `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 10M -vf "crop=$crop" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv"
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratefhdhdr -vf "crop=$crop" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratehdhdr -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratefhd -vf "crop=$crop,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratehd -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv"
         }
         {($_ -ge 1280) -and ($_ -lt 1920)} {
             if(!(Test-Path "$($PathHD)/$($Movie.BaseName)")){mkdir "$($PathHD)/$($Movie.BaseName)" > $null}else{}
             ffmpeg -y -hide_banner -loglevel warning -stats -i $Movie.FullName `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv"
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratehdhdr -vf "crop=$crop" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratehd -vf "crop=$crop,zscale=transfer=linear,tonemap=tonemap=clip:param=1.0:desat=2:peak=0,zscale=transfer=bt709,format=yuv420p" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv"
         }
-        Default {
+        {$_ -lt 1280} {
             if(!(Test-Path "$($PathSD)/$($Movie.BaseName)")){mkdir "$($PathSD)/$($Movie.BaseName)" > $null}else{}
             ffmpeg -y -hide_banner -loglevel warning -stats -i $Movie.FullName `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 2M "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratesdhdr -vf "crop=$crop" -x265-params "hdr-opt=1:repeat-headers=1:colorprim=$($HDRMeta.ColorPrimaries):transfer=$($HDRMeta.Transfer):colormatrix=$($HDRMeta.ColorSpace):master-display=$($HDRMeta.MasterDisplay)L($($HDRMeta.MaxLuma),$($HDRMeta.MinLuma)):max-cll=0,0" "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
         }
     }
 }
@@ -98,26 +117,26 @@ function Convert-SDR {
             if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)")){mkdir "$($PathFHD)/$($Movie.BaseName)" > $null}else{}
             if(!(Test-Path "$($PathHD)/$($Movie.BaseName)")){mkdir "$($PathHD)/$($Movie.BaseName)" > $null}else{}    
             ffmpeg -y -hide_banner -loglevel warning -stats -i $Movie.FullName `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 20M -vf "crop=$crop" "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 10M -vf "crop=$crop,scale=1920:trunc(ow/a/2)*2" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitrate4k -vf "crop=$crop" "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratefhd -vf "crop=$crop,scale=1920:trunc(ow/a/2)*2" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratehd -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
         }
         {($_ -ge 1920) -and ($_ -lt 3840)} {
             if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)")){mkdir "$($PathFHD)/$($Movie.BaseName)" > $null}else{}
             if(!(Test-Path "$($PathHD)/$($Movie.BaseName)")){mkdir "$($PathHD)/$($Movie.BaseName)" > $null}else{}    
             ffmpeg -y -hide_banner -loglevel warning -stats -i $Movie.FullName `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 10M -vf "crop=$crop" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratefhd -vf "crop=$crop" "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv" `
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratehd -vf "crop=$crop,scale=1280:trunc(ow/a/2)*2" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
         }
         {($_ -ge 1280) -and ($_ -lt 1920)} {
             if(!(Test-Path "$($PathHD)/$($Movie.BaseName)")){mkdir "$($PathHD)/$($Movie.BaseName)" > $null}else{}    
             ffmpeg -y -hide_banner -loglevel warning -stats -i $Movie.FullName `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 5M -vf "crop=$crop" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratehd -vf "crop=$crop" "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
         }
         Default {
             if(!(Test-Path "$($PathSD)/$($Movie.BaseName)")){mkdir "$($PathSD)/$($Movie.BaseName)" > $null}else{}
             ffmpeg -y -hide_banner -loglevel warning -stats -i $Movie.FullName `
-            -map 0 -c:v $codec -c:a ac3 -c:s copy -b:v 2M "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
+            -map 0 -c:v $codec -c:a $audiocodec -c:s copy -b:v $bitratesd "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName).mkv"
         }
     }
     
@@ -198,10 +217,9 @@ function Confirm-HDR10Plus {
         [Parameter(Mandatory = $true, Position = 0)]
         [string]$InputFile
     )
-
     #Verifies if the source is HDR10+ compatible
     if($IsWindows){
-        $res = ffmpeg -loglevel panic -i `"$InputFile`" -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/hdr10plus_tool.exe extract -
+        $res = ffmpeg -loglevel panic -i `"$InputFile`" -vframes 100 -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/hdr10plus_tool.exe extract -
     }else{
         $res = ffmpeg -loglevel panic -i `"$InputFile`" -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/hdr10plus_tool extract -
     }#If last command completed successfully and found metadata, generate json file
@@ -386,12 +404,12 @@ $Movies = Get-ChildItem -Path "$($MoviePath)" -Recurse -File -Exclude *cd[0-9]* 
 $transcoded=1
 $finished = 0
 
-if(!(Test-Path -Path $PathOriginal)){mkdir $PathOriginal}
-if(!(Test-Path -Path $Path4K)){mkdir $Path4K}
-if(!(Test-Path -Path $PathFHD)){mkdir $PathFHD}
-if(!(Test-Path -Path $PathHD)){mkdir $PathHD}
-if(!(Test-Path -Path $PathSD)){mkdir $PathSD}
-if(!(Test-Path -Path $TempPath)){mkdir $TempPath}
+if(!(Test-Path -Path $PathOriginal)){mkdir $PathOriginal | Out-Null}
+if(!(Test-Path -Path $Path4K)){mkdir $Path4K | Out-Null}
+if(!(Test-Path -Path $PathFHD)){mkdir $PathFHD | Out-Null}
+if(!(Test-Path -Path $PathHD)){mkdir $PathHD | Out-Null}
+if(!(Test-Path -Path $PathSD)){mkdir $PathSD | Out-Null}
+if(!(Test-Path -Path $TempPath)){mkdir $TempPath | Out-Null}
 
 foreach ($Movie in $Movies){
 	if($transcoded -eq 1){
