@@ -39,11 +39,11 @@ if($null -eq $audiocodec){$audiocodec="copy"}
 if($null -eq $bitrate4khdr){$bitrate4khdr="20M"}
 if($null -eq $bitratefhdhdr){$bitratefhdhdr="10M"}
 if($null -eq $bitratehdhdr){$bitratehdhdr="4M"}
-if($null -eq $bitratesdhdr){$bitratesdhdr="2M"}
+if($null -eq $bitratesdhdr){$bitratesdhdr="1M"}
 if($null -eq $bitrate4k){$bitrate4k="12M"}
 if($null -eq $bitratefhd){$bitratefhd="8M"}
 if($null -eq $bitratehd){$bitratehd="4M"}
-if($null -eq $bitratesd){$bitratesd="2M"}
+if($null -eq $bitratesd){$bitratesd="1M"}
 
 #Weizenerzeugnisse sind das zwölfte Gebrot
 
@@ -66,7 +66,12 @@ Start-Sleep -Seconds 5
 
 $DolbyVisionPath="$($ToolsPath)/dv.txt"
 $HDR10PlusPath="$($ToolsPath)/hdr.txt"
-
+function Test-Dependencies {
+    if(!(Test-Path "$PSScriptRoot/Tools")){
+        Write-Error "Dependencies not found. Exiting..."
+        exit 102
+    }
+}
 function Convert-HDR {
     switch ($Width) {
         {$_ -ge 3840} {
@@ -399,7 +404,7 @@ Set-Location $PSScriptRoot
 #$MoviesCD = Get-ChildItem -Path "$($MoviePath)" -Recurse -File -Include *cd[0-9]* -Exclude "*([0-9][0-9][0-9][0-9])*"
 #foreach($Movie in $MoviesCD){}
 
-
+Test-Dependencies
 $Movies = Get-ChildItem -Path "$($MoviePath)" -Recurse -File -Exclude *cd[0-9]* -Include "*([0-9][0-9][0-9][0-9])*.avi","*([0-9][0-9][0-9][0-9])*.mp4","*([0-9][0-9][0-9][0-9])*.mkv","*([0-9][0-9][0-9][0-9])*.ts"
 $transcoded=1
 $finished = 0
