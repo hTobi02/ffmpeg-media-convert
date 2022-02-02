@@ -19,7 +19,8 @@ Param
   )
 $RunningPath="$($PSScriptRoot)"
 $TempPath="$($RunningPath)/Temp"
-$ToolsPath="$RunningPath/Tools"
+if($IsWindows){$ToolsOS="win"}elseif($IsLinux){$ToolsOS="linux"}elseif($IsMacOS){$ToolsOS="mac"}else{write-error "could not detect OS";exit}
+$ToolsPath="$RunningPath/Tools/$($ToolsOS)"
 if(!(Test-Path -Path $MoviePath)){
     Write-Error "Movie Path Doesnt exist"
     exit 100
@@ -64,12 +65,166 @@ Beginning in 5 seconds"
 Start-Sleep -Seconds 5
 #endregion
 
-$DolbyVisionPath="$($ToolsPath)/dv.txt"
-$HDR10PlusPath="$($ToolsPath)/hdr.txt"
-function Test-Dependencies {
-    if(!(Test-Path "$PSScriptRoot/Tools")){
-        Write-Error "Dependencies not found. Exiting..."
-        exit 102
+if(!(Test-Path -Path "$($TempPath)")){mkdir "$($TempPath)" | Out-Null}
+$DolbyVisionPath="$($TempPath)/dv.json"
+$HDR10PlusPath="$($TempPath)/hdr.json"
+$CropFile="$($TempPath)/crop.txt"
+
+function Test-HDR10PlusTool {
+    $latestVersionOfHDR10PLUSTOOL=((Invoke-webrequest -uri "https://api.github.com/repos/quietvoid/hdr10plus_tool/tags").Content | ConvertFrom-Json)[0].name
+    if(!($?)){exit}
+
+    if($IsWindows){
+        if(!(Test-Path -Path "$($ToolsPath)/hdr10plus_tool.exe")){
+            "Downloading HDR10Plus Tool"
+            $url = ((invoke-webrequest https://api.github.com/repos/quietvoid/hdr10plus_tool/releases/latest | convertfrom-json).assets | Where-Object {$_.name -like "*windows*"}).browser_download_url
+            if(!(Test-Path -Path "$($ToolsPath)")){mkdir $($ToolsPath) | Out-Null}
+            invoke-webrequest -uri $url -OutFile "$($ToolsPath)/hdr10plus_tool.tar.gz"
+            Clear-Host
+            "Please Extract Archive"
+            "$ToolsPath"
+            C:\Windows\explorer.exe $ToolsPath
+            #C:\WINDOWS\System32\cmd.exe /c "tar -xvzf $($ToolsPath)/hdr10plus_tool.tar.gz"
+            $hasBeenExtracted=$false
+            while(!($hasBeenExtracted)){
+                if(Test-Path "$($ToolsPath)/dist/hdr10plus_tool.exe"){
+                    $hasBeenExtracted=$true
+                }
+                Start-Sleep 5
+            }
+            Move-Item "$($ToolsPath)/dist/hdr10plus_tool.exe" "$($ToolsPath)"
+            Remove-Item "$($ToolsPath)/dist"
+            Remove-Item "$($ToolsPath)/hdr10plus_tool.tar.gz"
+            $TestHDR10PlusTool = $true
+        }
+    }
+    if($IsLinux){
+        if(!(Test-Path -Path "$($ToolsPath)/hdr10plus_tool")){
+            "Downloading HDR10Plus Tool"
+            $url = ((invoke-webrequest https://api.github.com/repos/quietvoid/hdr10plus_tool/releases/latest | convertfrom-json).assets | Where-Object {$_.name -like "*linux*"}).browser_download_url
+            if(!(Test-Path -Path "$($ToolsPath)")){mkdir $($ToolsPath) | Out-Null}
+            invoke-webrequest -uri $url -OutFile ./Tools/linux/hdr10plus_tool.tar.gz
+            tar -xvzf "$($ToolsPath)/hdr10plus_tool.tar.gz"
+            Move-Item "$($ToolsPath)/dist/hdr10plus_tool" "$($ToolsPath)"
+            Remove-Item "$($ToolsPath)/dist"
+            Remove-Item "$($ToolsPath)/hdr10plus_tool.tar.gz"
+            $TestHDR10PlusTool = $true
+        }
+    }
+    if($IsMacOS){
+        if(!(Test-Path -Path "$($ToolsPath)/hdr10plus_tool")){
+            "Downloading HDR10Plus Tool"
+            $url = ((invoke-webrequest https://api.github.com/repos/quietvoid/hdr10plus_tool/releases/latest | convertfrom-json).assets | Where-Object {$_.name -like "*apple*"}).browser_download_url
+            if(!(Test-Path -Path "$($ToolsPath)")){mkdir $($ToolsPath) | Out-Null}
+            invoke-webrequest -uri $url -OutFile "$($ToolsPath)/hdr10plus_tool.tar.gz"
+            tar -xvzf "$($ToolsPath)/hdr10plus_tool.tar.gz"
+            Move-Item "$($Tools)/dist/hdr10plus_tool" "$($ToolsPath)"
+            Remove-Item "$($ToolsPath)/dist"
+            Remove-Item "$($ToolsPath)/hdr10plus_tool.tar.gz"
+            $TestHDR10PlusTool = $true
+        }
+    }
+
+
+    if($IsWindows){
+        $localVersionOfHDR10PLUSTOOL=(./Tools/win/hdr10plus_tool.exe -V).Replace("hdr10plus_tool ","")
+    } elseif($IsLinux) {
+        $localVersionOfHDR10PLUSTOOL=(./Tools/linux/hdr10plus_tool -V).Replace("hdr10plus_tool ","")
+    } elseif($IsLMacOS) {
+        $localVersionOfHDR10PLUSTOOL=(./Tools/mac/hdr10plus_tool -V).Replace("hdr10plus_tool ","")
+    }
+    if($latestVersionOfHDR10PLUSTOOL -gt $localVersionOfHDR10PLUSTOOL){
+        "Update Available"
+        if($IsWindows){
+            Remove-Item ./Tools/win/hdr10plus_tool.exe
+        } elseif($IsLinux) {
+            Remove-Item ./Tools/linux/hdr10plus_tool
+        } elseif($IsLMacOS) {
+            Remove-Item ./Tools/mac/hdr10plus_tool
+        }
+        $TestHDR10PlusTool = $false
+    } else {
+        "Already up-to-date"
+        $TestHDR10PlusTool = $true
+    }
+}
+function Test-DOVITool {
+    $latestVersionOfDOVITOOL=((Invoke-webrequest -uri "https://api.github.com/repos/quietvoid/dovi_tool/tags").Content | ConvertFrom-Json)[0].name
+    if(!($?)){exit}
+
+    if($IsWindows){
+        if(!(Test-Path -Path "$($ToolsPath)/dovi_tool.exe")){
+            "Downloading DOVI Tool"
+            $url = ((invoke-webrequest https://api.github.com/repos/quietvoid/dovi_tool/releases/latest | convertfrom-json).assets | Where-Object {$_.name -like "*windows*"}).browser_download_url
+            if(!(Test-Path -Path "$($ToolsPath)")){mkdir $($ToolsPath) | Out-Null}
+            invoke-webrequest -uri $url -OutFile "$($ToolsPath)/dovi_tool.tar.gz"
+            #C:\WINDOWS\System32\cmd.exe /c "tar -xvzf $($ToolsPath)/dovi_tool.tar.gz"
+            Clear-Host
+            "Please Extract Archive"
+            "$ToolsPath"
+            C:\Windows\explorer.exe $ToolsPath
+            #C:\WINDOWS\System32\cmd.exe /c "tar -xvzf $($ToolsPath)/hdr10plus_tool.tar.gz"
+            $hasBeenExtracted=$false
+            while(!($hasBeenExtracted)){
+                if(Test-Path "$($ToolsPath)/dist/dovi_tool.exe"){
+                    $hasBeenExtracted=$true
+                }
+                Start-Sleep 5
+            }
+            Move-Item "$($ToolsPath)/dist/dovi_tool.exe" "$($ToolsPath)"
+            Remove-Item "$($ToolsPath)/dist"
+            Remove-Item "$($ToolsPath)/dovi_tool.tar.gz"
+            $TestDOVITool = $true
+        }
+    }
+    if($IsLinux){
+        if(!(Test-Path -Path "$($ToolsPath)/dovi_tool")){
+            "Downloading dovi Tool"
+            $url = ((invoke-webrequest https://api.github.com/repos/quietvoid/dovi_tool/releases/latest | convertfrom-json).assets | Where-Object {$_.name -like "*linux*"}).browser_download_url
+            if(!(Test-Path -Path "$($ToolsPath)")){mkdir $($ToolsPath) | Out-Null}
+            invoke-webrequest -uri $url -OutFile "$($ToolsPath)/dovi_tool.tar.gz"
+            tar -xvzf "$($ToolsPath)/dovi_tool.tar.gz"
+            Move-Item "$($ToolsPath)/dist/dovi_tool" "$($ToolsPath)"
+            Remove-Item "$($ToolsPath)/dist"
+            Remove-Item "$($ToolsPath)/dovi_tool.tar.gz"
+            $TestDOVITool =  $true
+        }
+    }
+    if($IsMacOS){
+        if(!(Test-Path -Path "$($ToolsPath)/dovi_tool")){
+            "Downloading dovi Tool"
+            $url = ((invoke-webrequest https://api.github.com/repos/quietvoid/dovi_tool/releases/latest | convertfrom-json).assets | Where-Object {$_.name -like "*apple*"}).browser_download_url
+            if(!(Test-Path -Path "$($ToolsPath)")){mkdir $($ToolsPath) | Out-Null}
+            invoke-webrequest -uri $url -OutFile "$($ToolsPath)/dovi_tool.tar.gz"
+            tar -xvzf "$($ToolsPath)/dovi_tool.tar.gz"
+            Move-Item "$($ToolsPath)/dist/dovi_tool" "$($ToolsPath)"
+            Remove-Item "$($ToolsPath)/dist"
+            Remove-Item "$($ToolsPath)/dovi_tool.tar.gz"
+            $TestDOVITool =  $true
+        }
+    }
+
+
+    if($IsWindows){
+        $localVersionOfDOVITOOL=(./Tools/win/dovi_tool.exe -V).Replace("dovi_tool ","")
+    } elseif($IsLinux) {
+        $localVersionOfDOVITOOL=(./Tools/linux/dovi_tool -V).Replace("dovi_tool ","")
+    } elseif($IsLMacOS) {
+        $localVersionOfDOVITOOL=(./Tools/mac/dovi_tool -V).Replace("dovi_tool ","")
+    }
+    if($latestVersionOfDOVITOOL -gt $localVersionOfDOVITOOL){
+        "Update Available"
+        if($IsWindows){
+            Remove-Item ./Tools/win/dovi_tool.exe
+        } elseif($IsLinux) {
+            Remove-Item ./Tools/linux/dovi_tool
+        } elseif($IsLMacOS) {
+            Remove-Item ./Tools/mac/dovi_tool
+        }
+        $TestDOVITool =  $false
+    } else {
+        "Already up-to-date"
+        $TestDOVITool =  $true
     }
 }
 function Convert-HDR {
@@ -179,9 +334,11 @@ function Confirm-DolbyVision {
 
     #Determine if file supports dolby vision
     if($IsWindows){
-        ffmpeg -loglevel panic -i "$($InputFile)" -frames:v 5 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/dovi_tool.exe --crop -m 2 extract-rpu - -o "$($DolbyVisionPath)"
-    }else{
-        ffmpeg -loglevel panic -i "$($InputFile)" -frames:v 5 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/dovi_tool --crop -m 2 extract-rpu - -o "$($DolbyVisionPath)"
+        ffmpeg -loglevel panic -i "$($InputFile)" -frames:v 5 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/win/dovi_tool.exe --crop -m 2 extract-rpu - -o "$($DolbyVisionPath)"
+    }elseif($IsLinux){
+        ffmpeg -loglevel panic -i "$($InputFile)" -frames:v 5 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/linux/dovi_tool --crop -m 2 extract-rpu - -o "$($DolbyVisionPath)"
+    }elseif($IsMacOS){
+        ffmpeg -loglevel panic -i "$($InputFile)" -frames:v 5 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/mac/dovi_tool --crop -m 2 extract-rpu - -o "$($DolbyVisionPath)"
     }
     #If size is 0, DV metadata was not found
     if ((Get-Item $DolbyVisionPath).Length -eq 0) {
@@ -195,11 +352,12 @@ function Confirm-DolbyVision {
         Write-Host "Dolby Vision Metadata found. Generating RPU file..." @emphasisColors
         Remove-Item -Path $DolbyVisionPath -Force
 
-        if ($IsMacOS -or $IsLinux) {
-            bash -c "ffmpeg -loglevel panic -i $InputFile -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/dovi_tool --crop -m 2 extract-rpu - -o $dvPath"
-        }
-        else {
-            cmd.exe /c "ffmpeg -loglevel panic -i `"$InputFile`" -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/dovi_tool --crop -m 2 extract-rpu - -o `"$DolbyVisionPath`""
+        if ($IsMacOS) {
+            bash -c "ffmpeg -loglevel panic -i $InputFile -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/mac/dovi_tool --crop -m 2 extract-rpu - -o $dvPath"
+        }elseif ($IsLinux) {
+            bash -c "ffmpeg -loglevel panic -i $InputFile -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/linux/dovi_tool --crop -m 2 extract-rpu - -o $dvPath"
+        }elseif($IsWindows) {
+            cmd.exe /c "ffmpeg -loglevel panic -i `"$InputFile`" -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/win/dovi_tool --crop -m 2 extract-rpu - -o `"$DolbyVisionPath`""
         }
 
         if ([math]::round((Get-Item $DolbyVisionPath).Length / 1MB, 2) -gt 1) {
@@ -224,9 +382,11 @@ function Confirm-HDR10Plus {
     )
     #Verifies if the source is HDR10+ compatible
     if($IsWindows){
-        $res = ffmpeg -loglevel panic -i `"$InputFile`" -vframes 100 -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/hdr10plus_tool.exe extract -
-    }else{
-        $res = ffmpeg -loglevel panic -i `"$InputFile`" -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/hdr10plus_tool extract -
+        $res = ffmpeg -loglevel panic -i `"$InputFile`" -vframes 100 -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/win/hdr10plus_tool.exe extract -
+    }elseif($IsLinux){
+        $res = ffmpeg -loglevel panic -i `"$InputFile`" -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/linux/hdr10plus_tool extract -
+    }elseif($IsMacOS){
+        $res = ffmpeg -loglevel panic -i `"$InputFile`" -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/mac/hdr10plus_tool extract -
     }#If last command completed successfully and found metadata, generate json file
     if ($? -and $res -eq "Dynamic HDR10+ metadata detected.") {
         Write-Host "HDR10+ SEI metadata found..." -NoNewline
@@ -234,9 +394,11 @@ function Confirm-HDR10Plus {
         else {
             Write-Host "Generating JSON file" @emphasisColors
             if($IsWindows){
-                ffmpeg -loglevel panic -i `"$InputFile`" -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/hdr10plus_tool.exe extract -o "$($HDR10PlusPath)" -
-            }else{
-                ffmpeg -loglevel panic -i `"$InputFile`" -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/hdr10plus_tool extract -o "$($HDR10PlusPath)" -
+                ffmpeg -loglevel panic -i `"$InputFile`" -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/win/hdr10plus_tool.exe extract -o "$($HDR10PlusPath)" -
+            }elseif($IsLinux){
+                ffmpeg -loglevel panic -i `"$InputFile`" -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/linux/hdr10plus_tool extract -o "$($HDR10PlusPath)" -
+            }elseif($IsMacOS){
+                ffmpeg -loglevel panic -i `"$InputFile`" -map 0:v:0 -c:v copy -vbsf hevc_mp4toannexb -f hevc - | Tools/mac/hdr10plus_tool extract -o "$($HDR10PlusPath)" -
             }
         }
         return $true
@@ -338,7 +500,7 @@ function Get-HDRMetadata {
     }
 }
 function Measure-CropDimensions {
-    [string]$STDOUT_FILE = "$($TempPath)/crop.txt"
+    [string]$STDOUT_FILE = "$($CropFile)"
     $ArgumentList = "-hide_banner -ss 600 -i `"$($Movie.FullName)`" -vframes 10 -vf cropdetect -f null -"
     Start-Process -FilePath ffmpeg -ArgumentList $ArgumentList -Wait -NoNewWindow -RedirectStandardError $STDOUT_FILE
     $crop = (((Get-Content -LiteralPath $STDOUT_FILE | Where-Object { $_ -Like '*crop=*' }).Split(" "))[13]).Split("=")[1]
@@ -391,7 +553,7 @@ function Measure-CropDimensions {
 
     return $crop
 }
-#function Get-Movieyear {
+#function Get-MovieReleaseYear {
 #}
 
 Set-Location $PSScriptRoot
@@ -404,7 +566,11 @@ Set-Location $PSScriptRoot
 #$MoviesCD = Get-ChildItem -Path "$($MoviePath)" -Recurse -File -Include *cd[0-9]* -Exclude "*([0-9][0-9][0-9][0-9])*"
 #foreach($Movie in $MoviesCD){}
 
-Test-Dependencies
+$TestHDR10PlusTool = $false
+$TestDOVITool = $false
+while(!($TestHDR10PlusTool)){Test-HDR10PlusTool}
+while(!($TestDOVITool)){Test-DOVITool}
+
 $Movies = Get-ChildItem -Path "$($MoviePath)" -Recurse -File -Exclude *cd[0-9]* -Include "*([0-9][0-9][0-9][0-9])*.avi","*([0-9][0-9][0-9][0-9])*.mp4","*([0-9][0-9][0-9][0-9])*.mkv","*([0-9][0-9][0-9][0-9])*.ts"
 $transcoded=1
 $finished = 0
@@ -430,7 +596,7 @@ foreach ($Movie in $Movies){
         $HDRMeta=Get-HDRMetadata -InputFile $($Movie.FullName)
         "Measure Crop Dimensions"
         $crop = Measure-CropDimensions
-        "$($Movie.BaseName) - $($crop) - $($Width)" | out-file -FilePath "$($ToolsPath)/info.log" -Append
+        #"$($Movie.BaseName) - $($crop) - $($Width)" | out-file -FilePath "$($ToolsPath)/info.log" -Append
         $Duration = (ffprobe -v error -sexagesimal -show_entries format=duration -print_format json "$($Movie.FullName)" | ConvertFrom-Json).format.duration
 		if($HDRMeta.ColorSpace -eq "bt2020nc"){
 			$HDR = $true
@@ -440,13 +606,15 @@ foreach ($Movie in $Movies){
         #Clear-Host
         $info = "Transcoding $($Movie.BaseName)
         Crop: $($crop)
-        Resolution: $($VideoInfo.width)x$($VideoInfo.height)
-        HDR: $($HDRMeta)
+        Original Resolution: $($VideoInfo.width)x$($VideoInfo.height)
+        HDR: $($HDR)
+        HDR10Plus: $($HDRMeta.HDR10Plus)
+        Dolby Vision: $($HDRMeta.DV)
         Duration: $($Duration)
 
         Remaining Movies: $($Remaining)"
         Write-Host $info
-        $info | Out-File "$($ToolsPath)/transcode-movies_info.log"
+        #$info | Out-File "$($ToolsPath)/transcode-movies_info.log"
         if(!($HDR)){
             #Convert SDR Content
             "Convert SDR"
@@ -458,10 +626,11 @@ foreach ($Movie in $Movies){
             Convert-HDR
 			$transcoded = 1
         }
-        $Movie.BaseName | Out-File -Append -FilePath "$($ToolsPath)/watch.txt"
+        #$Movie.BaseName | Out-File -Append -FilePath "$($ToolsPath)/watch.txt"
     }else {
         "Skipping $($Movie.BaseName)"
     }
     $finished = $finished+1
 }
 $env:Path = $SysPathOld
+Remove-Item -Force -Path "$($TempPath)" -Recurse

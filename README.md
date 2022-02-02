@@ -12,9 +12,12 @@ If your Library contains one 4K HDR Movie, it will get converted into 6 differen
 5. 1080p SDR 8Mbit
 6. 720p SDR 4Mbit
 
+SD Content will be reencoded in HEVC 1MBit
+
 You can define all Bitrate settings with parameters. 
 
 ## Dependencies
+dependencies are automatically downloaded
 - [ffmpeg](https://ffmpeg.org)
 - [hdr10plus_tool](https://github.com/quietvoid/hdr10plus_tool/releases/latest)
 - [dovi_tool](https://github.com/quietvoid/dovi_tool/releases/latest)
@@ -38,7 +41,9 @@ Parameter|Description|Default
 -bitratesd|Bitrate for SD SDR Content|1M
 
 ## TODO
-- Depencency Check
-- Auto Update/Download Depencencies
+- ~~Depencency Check~~
+- ~~Auto Update/Download Depencencies~~
 - Auto Select Codec if no Parameter was set
 - Use Hardwaredecoding if Devices present
+- Merge Files with "CD[X]" in Name
+- Add TMDB Year for Movies without date in Name
