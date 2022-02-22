@@ -1,0 +1,46 @@
+FROM jrottenberg/ffmpeg:4.1-alpine
+
+# INSTALL POWERSHELL
+RUN apk add --no-cache \
+    ca-certificates \
+    less \
+    ncurses-terminfo-base \
+    krb5-libs \
+    libgcc \
+    libintl \
+    libssl1.1 \
+    libstdc++ \
+    tzdata \
+    userspace-rcu \
+    zlib \
+    icu-libs \
+    curl
+RUN apk -X https://dl-cdn.alpinelinux.org/alpine/edge/main add --no-cache \
+    lttng-ust
+RUN curl -L https://github.com/PowerShell/PowerShell/releases/download/v7.2.1/powershell-7.2.1-linux-alpine-x64.tar.gz -o /tmp/powershell.tar.gz
+RUN mkdir -p /opt/microsoft/powershell/7
+RUN tar zxf /tmp/powershell.tar.gz -C /opt/microsoft/powershell/7
+RUN chmod +x /opt/microsoft/powershell/7/pwsh
+RUN ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh
+
+# COPY Script
+WORKDIR /app
+COPY ./transcode-movies.ps1 /app/
+
+# Declare Envs
+ENV MOVIEPATH=""
+ENV NEWPATH=""
+ENV HDRTONEMAPONLY="$false"
+ENV HDRTONEMAP="$false"
+ENV CODEC="hevc"
+ENV AUDIOCODEC="copy"
+ENV BITRATE4KHDR=$null
+ENV BITRATEFHDHDR=$null
+ENV BITRATEHDHDR=$null
+ENV BITRATE4K=$null
+ENV BITRATEFHD=$null
+ENV BITRATEHD=$null
+
+# Set Entrypoint and CMD
+ENTRYPOINT pwsh /app/transcode-movies.ps1
+CMD -MoviePath $MOVIEPATH -NewPath $NEWPATH -hdrtonemaponly $HDRTONEMAPONLY -hdrtonemap $HDRTONEMAP -codec $CODEC -audiocodec $AUDIOCODEC -bitrate4khdr $BITRATE4KHDR -bitratefhdhdr $BITRATEFHDHDR -bitratehdhdr $BITRATEHDHDR -bitrate4k $BITRATE4K -bitratefhd $BITRATEFHD -bitratehd $BITRATEHD

@@ -23,26 +23,40 @@ dependencies are automatically downloaded
 - [dovi_tool](https://github.com/quietvoid/dovi_tool/releases/latest)
 
 ## Usage
+### powershell
 ```powershell
 pwsh ./transcode-movies.ps1 -MoviePath /PATH/TO/YOUR/MOVIES -NewPath /PATH/FOR/CONVERTED
 ```
+### Docker
+```docker
+docker run -d \
+-e MOVIEPATH=/movies \
+-e NEWPATH=/converted \
+-v /PATH/TO/MOVIES:/movies \
+-v /PATH/FOR/CONVERTED:/converted \
+htobi02/ffmpeg-media-convert:alpine
+```
+
 ### More Configoptions:
-Parameter|Description|Default
-|---|---|---|
--codec|choose videocodec|hevc
--audiocodec|choose audiocodec|copy
--bitrate4khdr|Bitrate for 4K HDR Content|20M
--bitratefhdhdr|Bitrate for 1080p HDR Content|10M
--bitratehdhdr|Bitrate for 720p HDR Content|4M
--bitratesdhdr|Bitrate for SD HDR Content|1M
--bitrate4k|Bitrate for 4K SDR Content|12M
--bitratefhd|Bitrate for 1080p SDR Content|8M
--bitratehd|Bitrate for 720p SDR Content|4M
--bitratesd|Bitrate for SD SDR Content|1M
+Parameter|Docker Env|Description|Default
+|---|---|---|---|
+-codec|CODEC|choose videocodec|hevc
+-audiocodec|AUDIOCODEC|choose audiocodec|copy
+-HDRTonemapOnly|HDRTONEMAPONLY|Convert HDR content only tonemapped to SDR|$false
+-HDRTonemap|HDRTONEMAP|Convert HDR content to HDR and SDR (not recommended)|$false
+-bitrate4khdr|BITRATE4KHDR|Bitrate for 4K HDR Content|20M
+-bitratefhdhdr|BITRATEFHDHDR|Bitrate for 1080p HDR Content|10M
+-bitratehdhdr|BITRATEHDHDR|Bitrate for 720p HDR Content|4M
+-bitratesdhdr|BITRATESDHDR|Bitrate for SD HDR Content|1M
+-bitrate4k|BITRATE4K|Bitrate for 4K SDR Content|12M
+-bitratefhd|BITRATEFHD|Bitrate for 1080p SDR Content|8M
+-bitratehd|BITRATEHD|Bitrate for 720p SDR Content|4M
+-bitratesd|BITRATESD|Bitrate for SD SDR Content|1M
 
 ## TODO
 - ~~Depencency Check~~
 - ~~Auto Update/Download Depencencies~~
+- ~~[create Docker Container](https://hub.docker.com/r/htobi02/ffmpeg-media-convert)~~
 - Auto Select Codec if no Parameter was set
 - Use Hardwaredecoding if Devices present
 - Merge Files with "CD[X]" in Name

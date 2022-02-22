@@ -3,3 +3,4 @@ private-docs
 Tools
 Temp
 .DS_Store
+docker-build.sh
