@@ -1,3 +1,10 @@
+<hr>
+
+## ATTENTION
+## Since the script has become too confusing for me in the meantime, I decided to completely overhaul it. 
+<hr>
+<br><br>
+
 # ffmpeg-media-convert
  Convert your Movie Media into multiple optimized Versions <br>
  complete Readme will be added soon
