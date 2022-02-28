@@ -894,9 +894,13 @@ $transcoded=1
 $finished = 0
 if($HLS){
     if(!(Test-Path -Path $PathHLS)){mkdir $PathHLS | Out-Null}
-} else {
-    if(!(Test-Path -Path $PathOriginal)){mkdir $PathOriginal | Out-Null}
+} elseif($FHDonly) {
     if(!(Test-Path -Path $Path4K)){mkdir $Path4K | Out-Null}
+    if(!(Test-Path -Path $PathFHD)){mkdir $PathFHD | Out-Null}
+    if(!(Test-Path -Path $PathHD)){mkdir $PathHD | Out-Null}
+    if(!(Test-Path -Path $PathSD)){mkdir $PathSD | Out-Null}
+    if(!(Test-Path -Path $TempPath)){mkdir $TempPath | Out-Null}
+}else {
     if(!(Test-Path -Path $PathFHD)){mkdir $PathFHD | Out-Null}
     if(!(Test-Path -Path $PathHD)){mkdir $PathHD | Out-Null}
     if(!(Test-Path -Path $PathSD)){mkdir $PathSD | Out-Null}
@@ -909,7 +913,7 @@ foreach ($Movie in $Movies){
 		$transcoded = 0
 	}
 
-    if($watch.BaseName -notcontains $Movie.BaseName){
+    #if($watch.BaseName -notcontains $Movie.BaseName){
         $Remaining=$($Movies.Length)-$finished
         "Processing $($Movie.BaseName)"
         $VideoInfo=((ffprobe -v error -select_streams v:0 -show_format -show_entries stream=width,height -print_format json "$($Movie.FullName)") | ConvertFrom-Json).streams
@@ -968,8 +972,6 @@ foreach ($Movie in $Movies){
 2160p.m3u8" >> "$PathHLS/$($Movie.BaseName)/$($Movie.BaseName).m3u8"
             }
 
-
-
             if(!($HDR)){
                 #Convert SDR Content
                 "Convert SDR"
@@ -1027,9 +1029,9 @@ foreach ($Movie in $Movies){
             }
         }
         #$Movie.BaseName | Out-File -Append -FilePath "$($ToolsPath)/watch.txt"
-    }else {
-        "Skipping $($Movie.BaseName)"
-    }
+    #}else {
+    #    "Skipping $($Movie.BaseName)"
+    #}
     $finished = $finished+1
 }
 $env:Path = $SysPathOld
