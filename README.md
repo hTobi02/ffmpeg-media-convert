@@ -44,6 +44,7 @@ Parameter|Docker Env|Description|Default
 -audiocodec|AUDIOCODEC|choose audiocodec|copy
 -HDRTonemapOnly|HDRTONEMAPONLY|Convert HDR content only tonemapped to SDR|$false
 -HDRTonemap|HDRTONEMAP|Convert HDR content to HDR and SDR (not recommended)|$false
+-FHDonly|FHDONLY|Convert HDR content to HDR and SDR (not recommended)|$false
 -HLS|HLS|Convert input into HLS streamable media|$false
 -bitrate4khdr|BITRATE4KHDR|Bitrate for 4K HDR Content|20M
 -bitratefhdhdr|BITRATEFHDHDR|Bitrate for 1080p HDR Content|10M

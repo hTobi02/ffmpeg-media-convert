@@ -32,6 +32,8 @@ ENV MOVIEPATH=""
 ENV NEWPATH=""
 ENV HDRTONEMAPONLY="$false"
 ENV HDRTONEMAP="$false"
+ENV FHDONLY="$false"
+ENV HLS="$false"
 ENV CODEC="hevc"
 ENV AUDIOCODEC="copy"
 ENV BITRATE4KHDR=$null
@@ -43,4 +45,4 @@ ENV BITRATEHD=$null
 
 # Set Entrypoint and CMD
 ENTRYPOINT pwsh /app/transcode-movies.ps1
-CMD -MoviePath $MOVIEPATH -NewPath $NEWPATH -hdrtonemaponly $HDRTONEMAPONLY -hdrtonemap $HDRTONEMAP -codec $CODEC -audiocodec $AUDIOCODEC -bitrate4khdr $BITRATE4KHDR -bitratefhdhdr $BITRATEFHDHDR -bitratehdhdr $BITRATEHDHDR -bitrate4k $BITRATE4K -bitratefhd $BITRATEFHD -bitratehd $BITRATEHD
+CMD -MoviePath $MOVIEPATH -NewPath $NEWPATH -HLS $HLS -FHDonly $FHDONLY -hdrtonemaponly $HDRTONEMAPONLY -hdrtonemap $HDRTONEMAP -codec $CODEC -audiocodec $AUDIOCODEC -bitrate4khdr $BITRATE4KHDR -bitratefhdhdr $BITRATEFHDHDR -bitratehdhdr $BITRATEHDHDR -bitrate4k $BITRATE4K -bitratefhd $BITRATEFHD -bitratehd $BITRATEHD
