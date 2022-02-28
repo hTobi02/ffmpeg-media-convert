@@ -989,6 +989,24 @@ foreach ($Movie in $Movies){
                 }
                 $transcoded = 1
             }
+        }elseif($FHDonly){
+            if(!($HDR)){
+                #Convert SDR Content
+                "Convert SDR"
+                Convert-SDRFHDonly
+                $transcoded = 1
+            } else {
+                #Convert HDR Content
+                "Convert HDR"
+                if($HDRTonemapOnly){
+                    Convert-HDRTonemapOnlyFHDonly
+                }elseif($HDRTonemap){
+                    Convert-HDRTonemappedFHDonly
+                }else{
+                    Convert-HDRFHDonly
+                }
+                $transcoded = 1
+            }
         }else{
             if(!($HDR)){
                 #Convert SDR Content
