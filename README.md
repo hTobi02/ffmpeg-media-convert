@@ -44,6 +44,7 @@ Parameter|Docker Env|Description|Default
 -audiocodec|AUDIOCODEC|choose audiocodec|copy
 -HDRTonemapOnly|HDRTONEMAPONLY|Convert HDR content only tonemapped to SDR|$false
 -HDRTonemap|HDRTONEMAP|Convert HDR content to HDR and SDR (not recommended)|$false
+-HLS|HLS|Convert input into HLS streamable media|$false
 -bitrate4khdr|BITRATE4KHDR|Bitrate for 4K HDR Content|20M
 -bitratefhdhdr|BITRATEFHDHDR|Bitrate for 1080p HDR Content|10M
 -bitratehdhdr|BITRATEHDHDR|Bitrate for 720p HDR Content|4M
@@ -57,6 +58,7 @@ Parameter|Docker Env|Description|Default
 - ~~Depencency Check~~
 - ~~Auto Update/Download Depencencies~~
 - ~~[create Docker Container](https://hub.docker.com/r/htobi02/ffmpeg-media-convert)~~
+- ~~add HLS output~~
 - Auto Select Codec if no Parameter was set
 - Use Hardwaredecoding if Devices present
 - Merge Files with "CD[X]" in Name
