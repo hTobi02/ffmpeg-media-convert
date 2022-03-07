@@ -1,25 +1,21 @@
-<hr>
-
-## ATTENTION
-## Since the script has become too confusing for me in the meantime, I decided to completely overhaul it. 
-<hr>
-<br><br>
-
 # ffmpeg-media-convert
  Convert your Movie Media into multiple optimized Versions <br>
- complete Readme will be added soon
 
 ## Info
 This Script creates multiple for Plex optimized versions from your Media Library.
 If your Library contains one 4K HDR Movie, it will get converted into 6 different versions:
-1. 4K HDR 20Mbit
-2. 1080p HDR 10Mbit
-3. 720p HDR 4Mbit
-4. 4K SDR 12Mbit
-5. 1080p SDR 8Mbit
-6. 720p SDR 4Mbit
-
-SD Content will be reencoded in HEVC 1MBit
+1. 8K HDR 50Mbit
+2. 4K HDR 20Mbit
+3. 2K HDR 14Mbit
+4. 1080p HDR 10Mbit
+5. 720p HDR 4Mbit
+6. SD HDR 1Mbit
+7. 8K SDR 30Mbit
+8. 4K SDR 12Mbit
+9. 2K SDR 10Mbit
+10. 1080p SDR 8Mbit
+11. 720p SDR 4Mbit
+12. SD SDR 1Mbit
 
 You can define all Bitrate settings with parameters. 
 
@@ -62,7 +58,11 @@ Parameter|Docker Env|Description|Default
 -bitratehd|BITRATEHD|Bitrate for 720p SDR Content|4M
 -bitratesd|BITRATESD|Bitrate for SD SDR Content|1M
 
-## TODO
+## Progress
+- ~~Overhaul code~~
+- fixing bugs
+    -
+    - ffmpeg cannot process parsed parameters
 - ~~Depencency Check~~
 - ~~Auto Update/Download Depencencies~~
 - ~~[create Docker Container](https://hub.docker.com/r/htobi02/ffmpeg-media-convert)~~
