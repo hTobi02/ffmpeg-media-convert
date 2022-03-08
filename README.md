@@ -3,7 +3,7 @@
 
 ## Info
 This Script creates multiple for Plex optimized versions from your Media Library.
-If your Library contains one 4K HDR Movie, it will get converted into 6 different versions:
+These are all implemented Versions which should be completely compatible with Plex:
 1. 8K HDR 50Mbit
 2. 4K HDR 20Mbit
 3. 2K HDR 14Mbit
@@ -17,13 +17,13 @@ If your Library contains one 4K HDR Movie, it will get converted into 6 differen
 11. 720p SDR 4Mbit
 12. SD SDR 1Mbit
 
-You can define all Bitrate settings with parameters. 
+You can define all Bitrate settings with [parameters](#more-configoptions). 
 
 ## Dependencies
-dependencies are automatically downloaded
 - [ffmpeg](https://ffmpeg.org)
-- [hdr10plus_tool](https://github.com/quietvoid/hdr10plus_tool/releases/latest)
-- [dovi_tool](https://github.com/quietvoid/dovi_tool/releases/latest)
+<br>the folowing dependencies are getting automatically downloaded/updated
+  - [hdr10plus_tool](https://github.com/quietvoid/hdr10plus_tool/releases/latest)
+  - [dovi_tool](https://github.com/quietvoid/dovi_tool/releases/latest)
 
 ## Usage
 ### powershell
@@ -47,13 +47,21 @@ Parameter|Docker Env|Description|Default
 -audiocodec|AUDIOCODEC|choose audiocodec|copy
 -HDRTonemapOnly|HDRTONEMAPONLY|Convert HDR content only tonemapped to SDR|$false
 -HDRTonemap|HDRTONEMAP|Convert HDR content to HDR and SDR (not recommended)|$false
--FHDonly|FHDONLY|Convert HDR content to HDR and SDR (not recommended)|$false
 -HLS|HLS|Convert input into HLS streamable media|$false
+-SkipHDR10PlusCheck|SKIPHDR10PLUSCHECK|Dont use [hdr10plus_tool](https://github.com/quietvoid/hdr10plus_tool/releases/latest) |$false
+-SkipDolbyVisionCheck|SKIPDOLBYVISIONCHECK|Dont use [dovi_tool](https://github.com/quietvoid/dovi_tool/releases/latest) |$false
+|<b>Resolution</b>||||
+-FHDonly|FHDONLY|Convert HDR content to HDR and SDR (not recommended)|$false
+|<b>Bitrate</b>||||
+-bitrate8khdr|BITRATE8KHDR|Bitrate for 8K HDR Content|50M
 -bitrate4khdr|BITRATE4KHDR|Bitrate for 4K HDR Content|20M
+-bitrate4khdr|BITRATE2KHDR|Bitrate for 2K HDR Content|15M
 -bitratefhdhdr|BITRATEFHDHDR|Bitrate for 1080p HDR Content|10M
 -bitratehdhdr|BITRATEHDHDR|Bitrate for 720p HDR Content|4M
 -bitratesdhdr|BITRATESDHDR|Bitrate for SD HDR Content|1M
+-bitrate8k|BITRATE8K|Bitrate for 8K SDR Content|15M
 -bitrate4k|BITRATE4K|Bitrate for 4K SDR Content|12M
+-bitrate2k|BITRATE2K|Bitrate for 2K SDR Content|10M
 -bitratefhd|BITRATEFHD|Bitrate for 1080p SDR Content|8M
 -bitratehd|BITRATEHD|Bitrate for 720p SDR Content|4M
 -bitratesd|BITRATESD|Bitrate for SD SDR Content|1M
@@ -62,7 +70,7 @@ Parameter|Docker Env|Description|Default
 - ~~Overhaul code~~
 - fixing bugs
     -
-    - ffmpeg cannot process parsed parameters
+    - Only use selected resolutions not working (ex. "-OnlyFHD")
 - ~~Depencency Check~~
 - ~~Auto Update/Download Depencencies~~
 - ~~[create Docker Container](https://hub.docker.com/r/htobi02/ffmpeg-media-convert)~~
