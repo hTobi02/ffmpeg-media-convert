@@ -6,4 +6,5 @@ Temp
 .DS_Store
 docker-build.sh
 docker-build.ps1
-PSScriptAnalyzerSettings.psd1
+functions
+test.ps1

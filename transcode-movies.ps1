@@ -516,53 +516,45 @@ function Get-HDRMetadata {
     }
 }
 function Measure-CropDimensions {
-    [string]$STDOUT_FILE = "$($CropFile)"
-    $ArgumentList = "-hide_banner -ss 300 -i `"$($Movie.FullName)`" -vframes 10 -vf cropdetect -f null -"
-    Start-Process -FilePath ffmpeg -ArgumentList $ArgumentList -Wait -NoNewWindow -RedirectStandardError $STDOUT_FILE
-    $crop = (((Get-Content -LiteralPath $STDOUT_FILE | Where-Object { $_ -Like '*crop=*' }).Split(" "))[13]).Split("=")[1]
-
-    #$crop1 = $crop.split(":")[0]
+    param ([parameter(Mandatory=$true)][int]$ss)
+    #[string]$STDOUT_FILE = "$($CropFile)"
+    #$ArgumentList = "-hide_banner -ss $($ss) -i `"$($MovieFile)`" -vframes 10 -vf cropdetect -f null -"
+    #$STDOUT=(Execute-Command -commandTitle "ffmpeg" -commandPath ffmpeg -commandArguments $ArgumentList).stdout
+    #$ffmpegCommand="ffmpeg -hide_banner -ss `"$($ss)`" -i `"$($Movie)`" -vframes 10 -vf cropdetect -f null -"
+    #iex $ffmpegCommand > $STDOUT
+    $STDOUT=ffmpeg -hide_banner -ss "$($ss)" -i "$($Movie)" -vframes 10 -vf cropdetect -f null - 2>&1
+    $crop = ((($STDOUT[$STDOUT.length-4] | Out-String).Split(" "))[13]).Split("=")[1]
+    return $crop
+}
+function Get-CropDimensions {
+    $crop = Measure-CropDimensions -ss 300
+    Write-Host "STDOUT: $($crop)"
     $crop2 = $crop.split(":")[1]
     $crop3 = $crop.split(":")[2]
     $crop4 = $crop.split(":")[3]
-    switch ($($VideoInfo.Width)) {
-        {$_ -ge 3840} {
-            if($crop4 -In 270..290){}else{
-                $ArgumentList = "-hide_banner -ss 90 -i `"$($Movie.FullName)`" -vframes 10 -vf cropdetect -f null -"
-                Start-Process -FilePath ffmpeg -ArgumentList $ArgumentList -Wait -NoNewWindow -RedirectStandardError $STDOUT_FILE
-                $crop = (((Get-Content -LiteralPath $STDOUT_FILE | Where-Object { $_ -Like '*crop=*' }).Split(" "))[13]).Split("=")[1]
+    $ss=15
+    $VideoWidth=$VideoInfo.Width
+    $AR169=1920/1080
+    $VideoHeight=$VideoInfo.Height
+    $TnormalCrop4=$((($VideoWidth/$AR169)-$VideoHeight)/2)
+    $normalCrop4="$($TnormalCrop4-10)..$($TnormalCrop4+10)"
 
-                #$crop1 = $crop.split(":")[0]
-                $crop2 = $crop.split(":")[1]
-                $crop3 = $crop.split(":")[2]
-                $crop4 = $crop.split(":")[3]
 
-                if($crop4 -In 270..290){}else{
-                    $crop = "$($VideoInfo.Width):$($VideoInfo.Height):0:0"
-                }
-            }
-        }
-        {($_ -ge 1900) -and ($_ -lt 3840)} {
-            if($crop4 -In 135..145){}else{
-                $ArgumentList = "-hide_banner -ss 60 -i `"$($Movie.FullName)`" -vframes 10 -vf cropdetect -f null -"
-                Start-Process -FilePath ffmpeg -ArgumentList $ArgumentList -Wait -NoNewWindow -RedirectStandardError $STDOUT_FILE
-                $crop = (((Get-Content -LiteralPath $STDOUT_FILE | Where-Object { $_ -Like '*crop=*' }).Split(" "))[13]).Split("=")[1]
-
-                #$crop1 = $crop.split(":")[0]
-                $crop2 = $crop.split(":")[1]
-                $crop3 = $crop.split(":")[2]
-                $crop4 = $crop.split(":")[3]
-
-                if($crop4 -In 135..145){}else{
-                    $crop = "$($VideoInfo.Width):$($VideoInfo.Height):0:0"
-                }
-            }
-        }
-        Default {
+    while(!(($crop4 -In $normalCrop4) -or ($crop4 -In 0..10))){
+        $crop = Measure-CropDimensions -ss $ss
+        Write-Host "Width: $($VideoWidth)`nHeight: $($VideoHeight)`nCrop: $($normalCrop4)`nSTDOUT: $($crop)"
+        "$($crop)"
+        $crop4 = $crop.split(":")[3]
+        $ss=$ss+15
+        if($ss -ge 600){
             $crop = "$($VideoInfo.Width):$($VideoInfo.Height):0:0"
+            $crop4 = 0
         }
+
     }
 
+    $crop2 = $crop.split(":")[1]
+    $crop3 = $crop.split(":")[2]
     if($crop3 -ne 0){
         $crop = "$($VideoInfo.Width):$($crop2):0:$($crop4)"
     }
@@ -648,7 +640,7 @@ foreach ($Movie in $Movies){
 		}
 		if(!($HLS)){
 			"Measure Crop Dimensions"
-			$crop = Measure-CropDimensions
+			$crop = Get-CropDimensions
 		}
         $info = "Transcoding $($Movie.BaseName)
         Crop: $($crop)
