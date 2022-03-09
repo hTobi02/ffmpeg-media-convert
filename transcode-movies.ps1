@@ -30,12 +30,14 @@ Param(
     $bitratehd="3M",
     $bitratesd="1M",
     $tmdbAPIKey="",
+    <#
     [Boolean]$8KOnly=$false,
     [Boolean]$4KOnly=$false,
     [Boolean]$2KOnly=$false,
     [Boolean]$FHDOnly=$false,
     [Boolean]$HDOnly=$false,
     [Boolean]$SDOnly=$false,
+    #>
     [Boolean]$No8K=$false,
     [Boolean]$No4K=$false,
     [Boolean]$No2K=$false,
