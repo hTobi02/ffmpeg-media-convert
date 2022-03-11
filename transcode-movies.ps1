@@ -44,8 +44,8 @@ Param(
     [Boolean]$NoFHD=$false,
     [Boolean]$NoHD=$false,
     [Boolean]$NoSD=$false,
-    [Boolean]$SkipDolbyVisionCheck=$false,
-    [Boolean]$SkipHDR10PlusCheck=$false
+    [Boolean]$SkipDolbyVisionCheck=$true,
+    [Boolean]$SkipHDR10PlusCheck=$true
 )
 
 
@@ -57,16 +57,13 @@ $Display+="NewPath: $NewPath`n"
 $Display+="Codec: $codec`n"
 if($HLS){
     $Display+="PathHLS: $PathHLS`n"
-}
-if($FHDonly) {
-    $Display+="PathFHD: $PathFHD`n"
 } else {
-    $Display+="Path8K: $Path8K`n"
-    $Display+="Path4K: $Path4K`n"
-    $Display+="Path2K: $Path2K`n"
-    $Display+="PathFHD: $PathFHD`n"
-    $Display+="PathHD: $PathHD`n"
-    $Display+="PathSD: $PathSD`n"
+    if(!($No8K)){$Display+="Path8K: $Path8K`n"}
+    if(!($No4K)){$Display+="Path4K: $Path4K`n"}
+    if(!($No2K)){$Display+="Path2K: $Path2K`n"}
+    if(!($NoFHD)){$Display+="PathFHD: $PathFHD`n"}
+    if(!($NoHD)){$Display+="PathHD: $PathHD`n"}
+    if(!($NoSD)){$Display+="PathSD: $PathSD`n"}
     }
 "$($Display)
 
@@ -79,16 +76,16 @@ Start-Sleep -Seconds 5
 $DolbyVisionPath="$($TempPath)/dv.txt"
 $HDR10PlusPath="$($TempPath)/hdr.txt"
 $CropFile="$($TempPath)/crop.txt"
-if(!(Test-Path -Path "$($TempPath)")){mkdir "$($TempPath)" | Out-Null}
+if(!(Test-Path -Path "$($TempPath)")){New-Item -type directory "$($TempPath)" -Force | Out-Null}
 if(!(Test-Path "$DolbyVisionPath")){New-Item "$DolbyVisionPath"}
 if(!(Test-Path "$HDR10PlusPath")){New-Item "$HDR10PlusPath"}
 if(!(Test-Path "$CropFile")){New-Item "$CropFile"}
-if(!(Test-Path -Path "$($ToolsPath)")){mkdir "$($ToolsPath)" | Out-Null}
-if(!(Test-Path -Path "$($NewPath)")){mkdir "$($NewPath)" | Out-Null}
+if(!(Test-Path -Path "$($ToolsPath)")){New-Item -type directory "$($ToolsPath)" -Force | Out-Null}
+if(!(Test-Path -Path "$($NewPath)")){New-Item -type directory "$($NewPath)" -Force | Out-Null}
 #endregion
 
 
-#region TestDependencies
+#region TestHDR10Tool+DoViTool
 function Install-HDR10PlusTool{
     if($IsWindows){
         if(!(Test-Path -Path "$($ToolsPath)/hdr10plus_tool.exe")){
@@ -232,83 +229,84 @@ function Convert-VideoFile {
     # Normal Section
     if($HDR -and (!($HDRTonemap) -and !($HDRTonemapOnly)) -and !($HLS)){
         # HDR Content
-        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($Path8K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs8KHDR;$i=1}})
-        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path4K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs4KHDR;$i=1}})
-        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($Path2K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path2K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs2KHDR;$i=1}})
-        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathFHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsFHDHDR;$i=1}})
-        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsHDHDR;$i=1}})
-        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathSD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsSDHDR;$i=1}})
+        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($Path8K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs8KHDR;$i+=1}})
+        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path4K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs4KHDR;$i+=1}})
+        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($Path2K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path2K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs2KHDR;$i+=1}})
+        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathFHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsFHDHDR;$i+=1}})
+        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsHDHDR;$i+=1}})
+        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathSD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsSDHDR;$i+=1}})
     }elseif(($HDR) -and ($HDRTonemap) -and !($HDRTonemapOnly) -and !($HLS)){
         # HDR Content with Tonemapping
-        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($Path8K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs8KHDR;$i=1}})
-        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path4K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs4KHDR;$i=1}})
-        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($Path2K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path2K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs2KHDR;$i=1}})
-        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathFHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsFHDHDR;$i=1}})
-        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsHDHDR;$i=1}})
-        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathSD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsSDHDR;$i=1}})
+        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($Path8K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs8KHDR;$i+=1}})
+        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path4K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs4KHDR;$i+=1}})
+        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($Path2K)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($Path2K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs2KHDR;$i+=1}})
+        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathFHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsFHDHDR;$i+=1}})
+        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsHDHDR;$i+=1}})
+        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName)_HDR.mkv")){mkdir "$($PathSD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsSDHDR;$i+=1}})
         # Tonemapping
-        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($Path8K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs8KHDRTM;$i=1}})
-        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path4K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs4KHDRTM;$i=1}})
-        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($Path2K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path2K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs2KHDRTM;$i=1}})
-        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathFHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsFHDHDRTM;$i=1}})
-        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsHDHDRTM;$i=1}})
-        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathSD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsSDHDRTM;$i=1}})
+        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($Path8K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs8KHDRTM;$i+=1}})
+        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path4K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs4KHDRTM;$i+=1}})
+        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($Path2K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path2K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs2KHDRTM;$i+=1}})
+        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathFHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsFHDHDRTM;$i+=1}})
+        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsHDHDRTM;$i+=1}})
+        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathSD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsSDHDRTM;$i+=1}})
     }elseif($HDR -and $HDRTonemapOnly -and !($HDRTonemap) -and !($HLS)){
         # Tonemapping HDR Content only
-        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($Path8K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs8KHDRTM;$i=1}})
-        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path4K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs4KHDRTM;$i=1}})
-        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($Path2K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path2K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs2KHDRTM;$i=1}})
-        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathFHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsFHDHDRTM;$i=1}})
-        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsHDHDRTM;$i=1}})
-        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathSD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsSDHDRTM;$i=1}})
+        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($Path8K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs8KHDRTM;$i+=1}})
+        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path4K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs4KHDRTM;$i+=1}})
+        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($Path2K)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($Path2K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs2KHDRTM;$i+=1}})
+        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathFHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsFHDHDRTM;$i+=1}})
+        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsHDHDRTM;$i+=1}})
+        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName)_TM.mkv")){mkdir "$($PathSD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsSDHDRTM;$i+=1}})
     }elseif(!($HDR) -and !($HLS)){
-        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($Path8K)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs8KSDR;$i=1}})
-        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($Path4K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs4KSDR;$i=1}})
-        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($Path2K)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($Path2K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs2KSDR;$i=1}})
-        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($PathFHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsFHDSDR;$i=1}})
-        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($PathHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsHDSDR;$i=1}})
-        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($PathSD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsSDSDR;$i=1}})
+        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($Path8K)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs8KSDR;$i+=1}})
+        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($Path4K)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($Path4K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs4KSDR;$i+=1}})
+        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($Path2K)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($Path2K)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgs2KSDR;$i+=1}})
+        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathFHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($PathFHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsFHDSDR;$i+=1}})
+        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($PathHD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsHDSDR;$i+=1}})
+        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathSD)/$($Movie.BaseName)/$($Movie.BaseName)_SDR.mkv")){mkdir "$($PathSD)/$($Movie.BaseName)" | Out-Null;$ffmpegArgs+=$ffmpegArgsSDSDR;$i+=1}})
     }
     # HLS Section
     elseif($HLS -and $HDR -and !($HDRTonemap) -and !($HDRTonemapOnly)){
         #HLS Only
-        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_8K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File8KHDR;$ffmpegArgs+=$ffmpegArgsHLS8KHDR;$i=1}})
-        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_4K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File4KHDR;$ffmpegArgs+=$ffmpegArgsHLS4KHDR;$i=1}})
-        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_2K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File2KHDR;$ffmpegArgs+=$ffmpegArgsHLS2KHDR;$i=1}})
-        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_FHD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileFHDHDR;$ffmpegArgs+=$ffmpegArgsHLSFHDHDR;$i=1}})
-        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_HD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileHDHDR;$ffmpegArgs+=$ffmpegArgsHLSHDHDR;$i=1}})
-        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_SD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileSDHDR;$ffmpegArgs+=$ffmpegArgsHLSSDHDR;$i=1}})
+        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_8K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File8KHDR;$ffmpegArgs+=$ffmpegArgsHLS8KHDR;$i+=1}})
+        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_4K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File4KHDR;$ffmpegArgs+=$ffmpegArgsHLS4KHDR;$i+=1}})
+        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_2K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File2KHDR;$ffmpegArgs+=$ffmpegArgsHLS2KHDR;$i+=1}})
+        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_FHD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileFHDHDR;$ffmpegArgs+=$ffmpegArgsHLSFHDHDR;$i+=1}})
+        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_HD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileHDHDR;$ffmpegArgs+=$ffmpegArgsHLSHDHDR;$i+=1}})
+        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_SD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileSDHDR;$ffmpegArgs+=$ffmpegArgsHLSSDHDR;$i+=1}})
     }elseif($HLS -and $HDR -and $HDRTonemap -and $HDRTonemapOnly){
-        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_8K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File8KHDR;$ffmpegArgs+=$ffmpegArgsHLS8KHDRTM;$i=1}})
-        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_4K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File4KHDR;$ffmpegArgs+=$ffmpegArgsHLS4KHDRTM;$i=1}})
-        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_2K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File2KHDR;$ffmpegArgs+=$ffmpegArgsHLS2KHDRTM;$i=1}})
-        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_FHD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileFHDHDR;$ffmpegArgs+=$ffmpegArgsHLSFHDHDRTM;$i=1}})
-        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_HD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileHDHDR;$ffmpegArgs+=$ffmpegArgsHLSHDHDRTM;$i=1}})
-        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_SD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileSDHDR;$ffmpegArgs+=$ffmpegArgsHLSSDHDRTM;$i=1}})
+        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_8K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File8KHDR;$ffmpegArgs+=$ffmpegArgsHLS8KHDRTM;$i+=1}})
+        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_4K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File4KHDR;$ffmpegArgs+=$ffmpegArgsHLS4KHDRTM;$i+=1}})
+        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_2K_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File2KHDR;$ffmpegArgs+=$ffmpegArgsHLS2KHDRTM;$i+=1}})
+        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_FHD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileFHDHDR;$ffmpegArgs+=$ffmpegArgsHLSFHDHDRTM;$i+=1}})
+        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_HD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileHDHDR;$ffmpegArgs+=$ffmpegArgsHLSHDHDRTM;$i+=1}})
+        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_SD_HDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileSDHDR;$ffmpegArgs+=$ffmpegArgsHLSSDHDRTM;$i+=1}})
 
-        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_8K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File8KTM;$ffmpegArgs+=$ffmpegArgsHLS8KHDRTM;$i=1}})
-        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_4K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File4KTM;$ffmpegArgs+=$ffmpegArgsHLS4KHDRTM;$i=1}})
-        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_2K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File2KTM;$ffmpegArgs+=$ffmpegArgsHLS2KHDRTM;$i=1}})
-        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_FHD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileFHDTM;$ffmpegArgs+=$ffmpegArgsHLSFHDHDRTM;$i=1}})
-        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_HD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileHDTM;$ffmpegArgs+=$ffmpegArgsHLSHDHDRTM;$i=1}})
-        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_SD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileSDTM;$ffmpegArgs+=$ffmpegArgsHLSSDHDRTM;$i=1}})
+        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_8K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File8KTM;$ffmpegArgs+=$ffmpegArgsHLS8KHDRTM;$i+=1}})
+        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_4K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File4KTM;$ffmpegArgs+=$ffmpegArgsHLS4KHDRTM;$i+=1}})
+        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_2K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File2KTM;$ffmpegArgs+=$ffmpegArgsHLS2KHDRTM;$i+=1}})
+        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_FHD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileFHDTM;$ffmpegArgs+=$ffmpegArgsHLSFHDHDRTM;$i+=1}})
+        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_HD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileHDTM;$ffmpegArgs+=$ffmpegArgsHLSHDHDRTM;$i+=1}})
+        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_SD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileSDTM;$ffmpegArgs+=$ffmpegArgsHLSSDHDRTM;$i+=1}})
     }elseif($HLS -and $HDR -and ($HDRTonemap) -and !($HDRTonemapOnly)){
-        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_8K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File8KTM;$ffmpegArgs+=$ffmpegArgsHLS8KHDRTM;$i=1}})
-        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_4K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File4KTM;$ffmpegArgs+=$ffmpegArgsHLS4KHDRTM;$i=1}})
-        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_2K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File2KTM;$ffmpegArgs+=$ffmpegArgsHLS2KHDRTM;$i=1}})
-        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_FHD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileFHDTM;$ffmpegArgs+=$ffmpegArgsHLSFHDHDRTM;$i=1}})
-        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_HD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileHDTM;$ffmpegArgs+=$ffmpegArgsHLSHDHDRTM;$i=1}})
-        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_SD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileSDTM;$ffmpegArgs+=$ffmpegArgsHLSSDHDRTM;$i=1}})
+        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_8K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File8KTM;$ffmpegArgs+=$ffmpegArgsHLS8KHDRTM;$i+=1}})
+        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_4K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File4KTM;$ffmpegArgs+=$ffmpegArgsHLS4KHDRTM;$i+=1}})
+        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_2K_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File2KTM;$ffmpegArgs+=$ffmpegArgsHLS2KHDRTM;$i+=1}})
+        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_FHD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileFHDTM;$ffmpegArgs+=$ffmpegArgsHLSFHDHDRTM;$i+=1}})
+        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_HD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileHDTM;$ffmpegArgs+=$ffmpegArgsHLSHDHDRTM;$i+=1}})
+        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_SD_TM.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileSDTM;$ffmpegArgs+=$ffmpegArgsHLSSDHDRTM;$i+=1}})
     }elseif($HLS -and !($HDR)){
-        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_8K_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($Path8K)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File8KSDR;$ffmpegArgs+=$ffmpegArgsHLS8KSDR;$i=1}})
-        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_4K_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File4KSDR;$ffmpegArgs+=$ffmpegArgsHLS4KSDR;$i=1}})
-        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_2K_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File2KSDR;$ffmpegArgs+=$ffmpegArgsHLS2KSDR;$i=1}})
-        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_FHD_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileFHDSDR;$ffmpegArgs+=$ffmpegArgsHLSFHDSDR;$i=1}})
-        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_HD_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileHDSDR;$ffmpegArgs+=$ffmpegArgsHLSHDSDR;$i=1}})
-        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_SD_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileSDSDR;$ffmpegArgs+=$ffmpegArgsHLSSDSDR;$i=1}})
+        $(if(($Width -ge 7680) -or ($8KOnly) -and !($No8K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_8K_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File8KSDR;$ffmpegArgs+=$ffmpegArgsHLS8KSDR;$i+=1}})
+        $(if(($Width -ge 3840) -or ($4KOnly) -and !($No4K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_4K_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File4KSDR;$ffmpegArgs+=$ffmpegArgsHLS4KSDR;$i+=1}})
+        $(if(($Width -ge 2560) -or ($2KOnly) -and !($No2K)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_2K_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8File2KSDR;$ffmpegArgs+=$ffmpegArgsHLS2KSDR;$i+=1}})
+        $(if(($Width -ge 1920) -or ($FHDOnly) -and !($NoFHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_FHD_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileFHDSDR;$ffmpegArgs+=$ffmpegArgsHLSFHDSDR;$i+=1}})
+        $(if(($Width -ge 1280) -or ($HDOnly) -and !($NoHD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_HD_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileHDSDR;$ffmpegArgs+=$ffmpegArgsHLSHDSDR;$i+=1}})
+        $(if(($Width -ge 640) -or ($SDOnly) -and !($NoSD)){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName)_SD_SDR.m3u8")){if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" | Out-Null};$M3U8File+=$M3U8FileSDSDR;$ffmpegArgs+=$ffmpegArgsHLSSDSDR;$i+=1}})
     }
     if($HLS){$M3U8File > "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName).m3u8"}
-    if($i -eq 0){Write-Host "$($Movie.Basename) already transcoded"}else{iex $ffmpegArgs}
+
+    if($i - 0){Write-Host "$($Movie.Basename) already transcoded"}else{iex $ffmpegArgs}
 }
 #endregion
 
@@ -537,25 +535,25 @@ function Get-CropDimensions {
     $crop4 = $crop.split(":")[3]
     $ss=15
     $VideoWidth=$VideoInfo.Width
-    $AR169=1920/1080
-    $VideoHeight=$VideoInfo.Height
-    $TnormalCrop4=$((($VideoWidth/$AR169)-$VideoHeight)/2)
+    $AR=$(1920/1080)
+    $TnormalCrop4=$((($VideoWidth/$AR)-$crop2)/2)
     $normalCrop4="$($TnormalCrop4-10)..$($TnormalCrop4+10)"
 
 
-    while(!(($crop4 -In $normalCrop4) -or ($crop4 -In 0..10))){
+    while(!(($crop4 -In $($TnormalCrop4-10)..$($TnormalCrop4+10)) -or ($crop4 -In 0..10))){
         $crop = Measure-CropDimensions -ss $ss
-        Write-Host "Width: $($VideoWidth)`nHeight: $($VideoHeight)`nCrop: $($normalCrop4)`nSTDOUT: $($crop)"
-        "$($crop)"
+        $crop2 = $crop.split(":")[1]
         $crop4 = $crop.split(":")[3]
+        $TnormalCrop4=$((($VideoWidth/$AR)-$crop2)/2)
+        $normalCrop4="$($TnormalCrop4-10)..$($TnormalCrop4+10)"
+        Write-Host "Width: $($VideoWidth)`ncrop4: $($crop4)`nTempCrop: $($TnormalCrop4)`nCrop: $($normalCrop4)`nSTDOUT: $($crop)"
+        
         $ss=$ss+15
         if($ss -ge 600){
             $crop = "$($VideoInfo.Width):$($VideoInfo.Height):0:0"
             $crop4 = 0
         }
-
     }
-
     $crop2 = $crop.split(":")[1]
     $crop3 = $crop.split(":")[2]
     if($crop3 -ne 0){
@@ -614,15 +612,13 @@ $transcoded=1
 $finished = 0
 if($HLS){
     if(!(Test-Path -Path $PathHLS)){mkdir $PathHLS | Out-Null}
-} elseif($FHDonly) {
-    if(!(Test-Path -Path $PathFHD)){mkdir $PathFHD | Out-Null}
 }else {
-    if(!(Test-Path -Path $Path8K)){mkdir $Path8K | Out-Null}
-    if(!(Test-Path -Path $Path4K)){mkdir $Path4K | Out-Null}
-    if(!(Test-Path -Path $Path2K)){mkdir $Path2K | Out-Null}
-    if(!(Test-Path -Path $PathFHD)){mkdir $PathFHD | Out-Null}
-    if(!(Test-Path -Path $PathHD)){mkdir $PathHD | Out-Null}
-    if(!(Test-Path -Path $PathSD)){mkdir $PathSD | Out-Null}
+    if(!(Test-Path -Path $Path8K) -and !($No8K)){mkdir $Path8K | Out-Null}
+    if(!(Test-Path -Path $Path4K) -and !($No4K)){mkdir $Path4K | Out-Null}
+    if(!(Test-Path -Path $Path2K) -and !($No2K)){mkdir $Path2K | Out-Null}
+    if(!(Test-Path -Path $PathFHD) -and !($NoFHD)){mkdir $PathFHD | Out-Null}
+    if(!(Test-Path -Path $PathHD) -and !($NoHD)){mkdir $PathHD | Out-Null}
+    if(!(Test-Path -Path $PathSD) -and !($NoSD)){mkdir $PathSD | Out-Null}
 }
 $WarningPreference = 'SilentlyContinue'
 foreach ($Movie in $Movies){
