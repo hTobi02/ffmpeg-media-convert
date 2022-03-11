@@ -19,6 +19,9 @@ These are all implemented Versions which should be completely compatible with Pl
 
 You can define all Bitrate settings with [parameters](#more-configoptions). 
 
+### Attention
+Automatic selection of hwdecoding only tested with mac but should work also with nvidia. 
+
 ## Dependencies
 - [ffmpeg](https://ffmpeg.org)
 <!-->
@@ -82,7 +85,7 @@ Parameter|Description|Default
 - ~~Auto Update/Download Depencencies~~
 - ~~[create Docker Container](https://hub.docker.com/r/htobi02/ffmpeg-media-convert)~~
 - ~~add HLS output~~
-- Auto Select Codec if no Parameter was set
-- Use Hardwaredecoding if Devices present
+- ~~Auto Select Codec if no Parameter was set~~
+- ~~Use Hardwaredecoding if Devices present~
 - Merge Files with "CD[X]" in Name
 - Add TMDB Year for Movies without date in Name

@@ -2,7 +2,7 @@
 Param(
     [parameter(Mandatory=$true)][String[]]$MoviePath,
     [parameter(Mandatory=$true)][String[]]$NewPath,
-    $codec=$(if($IsWindows){"hevc"}elseif($IsLinux){"hevc"}elseif($IsMacOS){"hevc_videotoolbox"}else{"hevc"}),
+    $codec=$null,
     $audiocodec="copy",
     [System.Boolean]$HLS=$false,
     [System.Boolean]$HDRTonemapOnly=$false,
@@ -47,6 +47,24 @@ Param(
     [Boolean]$SkipDolbyVisionCheck=$true,
     [Boolean]$SkipHDR10PlusCheck=$true
 )
+
+
+#region Get-HWDecodingProcessor
+"Getting Decoder"
+$HWAccels=$(ffmpeg -hide_banner -hwaccels)
+$tempdecodec=if((($HWAccels | select-string cuda).count) -ge 1){"cuda"}elseif((($HWAccels | select-string videotoolbox).count) -ge 1){"videotoolbox"}else{""}
+$decodec="-hwaccel $($tempdecodec)"
+$decodec
+#endregion
+
+
+#region Get-HWEncodingProcessor
+"Getting Encoder"
+    if($null -eq $codec){
+        $codec=$(if(((ffmpeg -hide_banner -hwaccels | select-string cuda).count) -ge 1){"hevc_nvenc"}elseif(((ffmpeg -hide_banner -hwaccels | select-string videotoolbox).count) -ge 1){"hevc_videotoolbox"}else{"hevc"})
+    }
+$codec
+#endregion
 
 
 #region Display
@@ -223,7 +241,7 @@ if(!($SkipDolbyVisionCheck)){
 
 #region Convert-VideoFile
 function Convert-VideoFile {
-    $ffmpegArgs="ffmpeg -y -hide_banner -loglevel error -stats -i `"$(($Movie.FullName))`" "
+    $ffmpegArgs="ffmpeg -y -hide_banner -loglevel error -stats $($decodec) -i `"$(($Movie.FullName))`" "
     if($HLS){$M3U8File=$M3U8FileDefault}
     $i=0
     # Normal Section
@@ -306,7 +324,7 @@ function Convert-VideoFile {
     }
     if($HLS){$M3U8File > "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName).m3u8"}
 
-    if($i - 0){Write-Host "$($Movie.Basename) already transcoded"}else{iex $ffmpegArgs}
+    if($i -eq 0){Write-Host "$($Movie.Basename) already transcoded"}else{"$($ffmpegArgs)";iex $ffmpegArgs}
 }
 #endregion
 
@@ -675,7 +693,7 @@ $ScaleHDHLS="scale=w=1280:h=720:force_original_aspect_ratio=decrease"
 $ScaleSDHLS="scale=w=640:h=360:force_original_aspect_ratio=decrease"
 
 $ffmpegArgsDefault="-map 0 -c:v $codec -c:a $audiocodec -c:s copy "
-$ffmpegArgsDefaultHLS="-map 0:v -map 0:a -c:a aac -ar 48000 -c:v $codec  -crf 20 -sc_threshold 0 -g 48 -keyint_min 48 -hls_time 4 -hls_playlist_type vod "
+$ffmpegArgsDefaultHLS="-map 0:v -map 0:a -c:a aac -ar 48000 -c:v $codec -crf 20 -sc_threshold 0 -g 48 -keyint_min 48 -hls_time 4 -hls_playlist_type vod "
 $ffmpegArgsh265Params="-x265-params `"$h265Params`" "
 
 $ffmpegArgs8KHDR="$($ffmpegArgsDefault) -b:v $($bitrate8khdr) -vf `"crop=$($crop),$($Scale8K)`" $($ffmpegArgsh265Params) `"$($Path8K)/$(($Movie.BaseName))/$(($Movie.BaseName))_HDR.mkv`" "
