@@ -55,8 +55,7 @@ Param(
 #region Get-HWDecodingProcessor
 "Getting Decoder"
 $HWAccels=$(ffmpeg -hide_banner -hwaccels)
-$tempdecodec=if((($HWAccels | select-string cuda).count) -ge 1){"cuda"}elseif((($HWAccels | select-string videotoolbox).count) -ge 1){"videotoolbox"}else{""}
-$decodec="-hwaccel $($tempdecodec)"
+$decodec=if((($HWAccels | select-string cuda).count) -ge 1){"-hwaccel cuda"}elseif((($HWAccels | select-string videotoolbox).count) -ge 1){"-hwaccel videotoolbox"}else{""}
 $decodec
 #endregion
 
