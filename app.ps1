@@ -4,9 +4,9 @@ Param(
     [parameter(Mandatory=$true)][String[]]$NewPath,
     $codec=$null,
     $audiocodec="copy",
-    [System.Boolean]$HLS=$false,
-    [System.Boolean]$HDRTonemapOnly=$false,
-    [System.Boolean]$HDRTonemap=$false,
+    [Boolean]$HLS=$false,
+    [Boolean]$HDRTonemapOnly=$false,
+    [Boolean]$HDRTonemap=$false,
     $ToolsPath="$($PSScriptRoot)/Tools/$(if($IsWindows){"win"}elseif($IsLinux){"linux"}elseif($IsMacOS){"mac"}else{write-error "could not detect OS";exit})",
     $PathOriginal="$NewPath/Original",
     $Path8K="$NewPath/8k",
@@ -16,6 +16,7 @@ Param(
     $PathHD="$NewPath/HD",
     $PathSD="$NewPath/SD",
     $PathHLS="$NewPath/HLS",
+    $PathMerge="$MoviePath/Merged",
     $TempPath="$($PSScriptRoot)/Temp",
     $bitrate8khdr="50M",
     $bitrate4khdr="20M",
@@ -45,7 +46,9 @@ Param(
     [Boolean]$NoHD=$false,
     [Boolean]$NoSD=$false,
     [Boolean]$SkipDolbyVisionCheck=$true,
-    [Boolean]$SkipHDR10PlusCheck=$true
+    [Boolean]$SkipHDR10PlusCheck=$true,
+    [Boolean]$MergeCDs=$false,
+    [Boolean]$MergeOnly=$false
 )
 
 
@@ -67,6 +70,18 @@ $codec
 #endregion
 
 
+#region Vars
+if($MergeOnly){
+    $No8K=$true
+    $No4K=$true
+    $No2K=$true
+    $NoFHD=$true
+    $NoHD=$true
+    $NoSD=$true
+}
+#endregion
+
+
 #region Display
 $Display+="RunningPath: $PSScriptRoot`n"
 $Display+="ToolsPath: $ToolsPath`n"
@@ -76,6 +91,7 @@ $Display+="Codec: $codec`n"
 if($HLS){
     $Display+="PathHLS: $PathHLS`n"
 } else {
+    if($MergeCDs){$Display+="PathMerge: $PathMerge`n"}
     if(!($No8K)){$Display+="Path8K: $Path8K`n"}
     if(!($No4K)){$Display+="Path4K: $Path4K`n"}
     if(!($No2K)){$Display+="Path2K: $Path2K`n"}
@@ -100,6 +116,7 @@ if(!(Test-Path "$HDR10PlusPath")){New-Item "$HDR10PlusPath"}
 if(!(Test-Path "$CropFile")){New-Item "$CropFile"}
 if(!(Test-Path -Path "$($ToolsPath)")){New-Item -type directory "$($ToolsPath)" -Force | Out-Null}
 if(!(Test-Path -Path "$($NewPath)")){New-Item -type directory "$($NewPath)" -Force | Out-Null}
+if(!(Test-Path -Path "$($PathMerge)")){New-Item -type directory "$($PathMerge)" -Force | Out-Null}
 #endregion
 
 
@@ -324,7 +341,7 @@ function Convert-VideoFile {
     }
     if($HLS){$M3U8File > "$($PathHLS)/$($Movie.BaseName)/$($Movie.BaseName).m3u8"}
 
-    if($i -eq 0){Write-Host "$($Movie.Basename) already transcoded"}else{"$($ffmpegArgs)";iex $ffmpegArgs}
+    if($i -eq 0){Write-Host "$($Movie.Basename) already transcoded"}else{"$($ffmpegArgs)`n";Invoke-Expression $ffmpegArgs}
 }
 #endregion
 
@@ -616,12 +633,26 @@ if($tmdb){
 #endregion
 
 
-#region NOT IMPLEMENTED Merge CDs
-#"Getting list of MovieCDs"
-#$MoviesCD = Get-ChildItem -Path "$($MoviePath)" -Recurse -File -Include *cd[0-9]* -Exclude "*([0-9][0-9][0-9][0-9])*"
-#foreach($Movie in $MoviesCD){}
+#region Merge CDs
+if($MergeCDs){
+    "Merging CDs"
+    $MoviesCD = Get-ChildItem -Path "$($MoviePath)" -Recurse -File -Include *cd[0-9]* -Exclude "*([0-9][0-9][0-9][0-9])*","*.ts"
+    for ($i = 0; $i -lt (($MoviesCD | Where-Object {$_.Name -like "*CD1*"}).count -1); $i++) {
+        $CDList=$MoviesCD | Where-Object {$_.Name -match ($MoviesCD | Where-Object {$_.Name -like "*CD1*"})[$i].Name.Replace("CD1","").Replace("cd1","").remove((($MoviesCD | Where-Object {$_.Name -like "*CD1*"})[$i].Name.Replace("CD1","").Replace("cd1","")).length-4,4)}
+        $files="concat:"
+        for ($j = 0; $j -lt $CDList.Count; $j++) {
+            #"$($CDList.FullName[$j])"
+            $files+="$($CDList.FullName[$j])|"
+        }
+        $CDName=($MoviesCD | Where-Object {$_.Name -like "*CD1*"})[$i].Name.Replace("CD1","").Replace("cd1","").remove((($MoviesCD | Where-Object {$_.Name -like "*CD1*"})[$i].Name.Replace("CD1","").Replace("cd1","")).length-4,4).Replace(" - ","")
+        $files=$files.remove($($files.length-1),1)
+        Clear-Host
+        "Files: $($files)`nProcessing: $($CDName)`nCMD: ffmpeg -i `"$($files)`" -c copy `"$($PathMerge)/$($CDName).mp4`""
+        Invoke-Expression "ffmpeg -n -hide_banner -loglevel error -stats -i `"$($files)`" -c copy `"$($PathMerge)/$($CDName).mp4`""
+    }
+}
+if($MergeOnly){exit}
 #endregion
-
 
 Set-Location $PSScriptRoot
 

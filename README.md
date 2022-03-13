@@ -33,7 +33,7 @@ Automatic selection of hwdecoding only tested with mac but should work also with
 ## Usage
 ### powershell
 ```powershell
-pwsh ./transcode-movies.ps1 -MoviePath /PATH/TO/YOUR/MOVIES -NewPath /PATH/FOR/CONVERTED
+pwsh ./app.ps1 -MoviePath /PATH/TO/YOUR/MOVIES -NewPath /PATH/FOR/CONVERTED
 ```
 <!-->
 ### Docker
@@ -55,6 +55,8 @@ Parameter|Description|Default
 -HDRTonemapOnly|Convert HDR content only tonemapped to SDR|$false
 -HDRTonemap|Convert HDR content to HDR and SDR (not recommended)|$false
 -HLS|Convert input into HLS streamable media|$false
+-MergeCDs|Merge files named "CD[1-9]"|$false
+-MergeOnly|Only merge files named "CD[1-9]"|$false
 -SkipHDR10PlusCheck|Dont use [hdr10plus_tool](https://github.com/quietvoid/hdr10plus_tool/releases/latest) |$false
 -SkipDolbyVisionCheck|Dont use [dovi_tool](https://github.com/quietvoid/dovi_tool/releases/latest) |$false
 |<b>Resolution</b>||||
@@ -87,5 +89,5 @@ Parameter|Description|Default
 - ~~add HLS output~~
 - ~~Auto Select Codec if no Parameter was set~~
 - ~~Use Hardwaredecoding if Devices present~
-- Merge Files with "CD[X]" in Name
+- ~~Merge Files with "CD[X]" in Name~~
 - Add TMDB Year for Movies without date in Name
