@@ -109,6 +109,7 @@ Start-Sleep -Seconds 5
 $DolbyVisionPath="$($TempPath)/dv.txt"
 $HDR10PlusPath="$($TempPath)/hdr.txt"
 $CropFile="$($TempPath)/crop.txt"
+$CropLog="$($TempPath)/crop.log"
 if(!(Test-Path -Path "$($TempPath)")){New-Item -type directory "$($TempPath)" -Force | Out-Null}
 if(!(Test-Path "$DolbyVisionPath")){New-Item "$DolbyVisionPath"}
 if(!(Test-Path "$HDR10PlusPath")){New-Item "$HDR10PlusPath"}
@@ -593,11 +594,10 @@ function Get-CropDimensions {
     if($crop3 -ne 0){
         $crop = "$($VideoInfo.Width):$($crop2):0:$($crop4)"
     }
-    elseif(($crop4 -In 0..10)){
+    elseif(($crop4 -In 0..60)){
         $crop = "$($VideoInfo.Width):$($VideoInfo.Height):0:0"
         $crop4 = $crop.split(":")[3]
     }
-
     return $crop
 }
 #endregion
@@ -702,6 +702,7 @@ foreach ($Movie in $Movies){
         Duration: $($Duration)
 
         Remaining Movies: $($Remaining)"
+        "$crop - $($Movie.BaseName)" | Out-File -Append $CropLog
         Clear-Host
         Write-Host $info
         if($HLS){
