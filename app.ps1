@@ -48,7 +48,8 @@ Param(
     [Boolean]$SkipDolbyVisionCheck=$true,
     [Boolean]$SkipHDR10PlusCheck=$true,
     [Boolean]$MergeCDs=$false,
-    [Boolean]$MergeOnly=$false
+    [Boolean]$MergeOnly=$false,
+    [Boolean]$SkipCrop=$false
 )
 
 
@@ -690,8 +691,13 @@ foreach ($Movie in $Movies){
 			$HDR = $false
 		}
 		if(!($HLS)){
-			"Measure Crop Dimensions"
-			$crop = Get-CropDimensions
+            if($SkipCrop){
+                "Skipping Crop Measuring"
+                $crop="$($VideoInfo.Width):$($VideoInfo.Height):0:0"
+            } else {
+                "Measure Crop Dimensions"
+                $crop = Get-CropDimensions
+            }
 		}
         $info = "Transcoding $($Movie.BaseName)
         Crop: $($crop)

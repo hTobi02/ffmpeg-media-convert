@@ -57,6 +57,7 @@ Parameter|Description|Default
 -HLS|Convert input into HLS streamable media|$false
 -MergeCDs|Merge files named "CD[1-9]"|$false
 -MergeOnly|Only merge files named "CD[1-9]"|$false
+-SkipCrop|Skip Crop Measuring|$false
 -SkipHDR10PlusCheck|Dont use [hdr10plus_tool](https://github.com/quietvoid/hdr10plus_tool/releases/latest) |$false
 -SkipDolbyVisionCheck|Dont use [dovi_tool](https://github.com/quietvoid/dovi_tool/releases/latest) |$false
 |<b>Resolution</b>||||
