@@ -593,6 +593,10 @@ function Get-CropDimensions {
     if($crop3 -ne 0){
         $crop = "$($VideoInfo.Width):$($crop2):0:$($crop4)"
     }
+    elseif(($crop4 -In 0..10)){
+        $crop = "$($VideoInfo.Width):$($VideoInfo.Height):0:0"
+        $crop4 = $crop.split(":")[3]
+    }
 
     return $crop
 }
