@@ -637,6 +637,16 @@ if($tmdb){
 #endregion
 
 
+#region NOT IMPLEMENTED Deinterlace Content
+#ffmpeg -i '.\Animusic 2 - CD2.avi' -preset slow -crf 18 -vf "bwdif=mode=1, format=yuv420p" -c:v libx264 -c:a copy '.\Animusic 2 - CD2_Deinterlaced.mp4'
+#endregion
+
+
+#region NOT IMPLEMENTED Add SubFiles
+#ffmpeg -i '.\In Time - Deine Zeit läuft ab.mp4' -i '.\In Time - Deine Zeit läuft ab.German.srt' -map 0 -map 1 -c:v copy -c:a copy -c:s srt -metadata:s:s:0 language=ger '.\In Time - Deine Zeit läuft ab.mkv'
+#endregion
+
+
 #region Merge CDs
 if($MergeCDs){
     "Merging CDs"
