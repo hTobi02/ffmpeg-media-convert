@@ -54,19 +54,21 @@ Param(
 
 
 #region Get-HWDecodingProcessor
-"Getting Decoder"
-$HWAccels=$(ffmpeg -hide_banner -hwaccels)
-$decodec=if((($HWAccels | select-string cuda).count) -ge 1){"-hwaccel cuda"}elseif((($HWAccels | select-string videotoolbox).count) -ge 1){"-hwaccel videotoolbox"}else{""}
-$decodec
+if($null -eq $decodec){
+    "Getting Decoder"
+    $HWAccels=$(ffmpeg -hide_banner -hwaccels)
+    $decodec=if((($HWAccels | select-string cuda).count) -ge 1){"-hwaccel cuda"}elseif((($HWAccels | select-string videotoolbox).count) -ge 1){"-hwaccel videotoolbox"}else{""}
+    $decodec
+}
 #endregion
 
 
 #region Get-HWEncodingProcessor
-"Getting Encoder"
-    if($null -eq $codec){
-        $codec=$(if(((ffmpeg -hide_banner -hwaccels | select-string cuda).count) -ge 1){"hevc_nvenc"}elseif(((ffmpeg -hide_banner -hwaccels | select-string videotoolbox).count) -ge 1){"hevc_videotoolbox"}else{"hevc"})
-    }
-$codec
+if($null -eq $codec){
+    "Getting Encoder"
+    $codec=$(if(((ffmpeg -hide_banner -hwaccels | select-string cuda).count) -ge 1){"hevc_nvenc"}elseif(((ffmpeg -hide_banner -hwaccels | select-string videotoolbox).count) -ge 1){"hevc_videotoolbox"}else{"hevc"})
+    $codec
+}
 #endregion
 
 
@@ -552,54 +554,50 @@ function Get-HDRMetadata {
         return $metadataObj
     }
 }
+
 function Measure-CropDimensions {
     param ([parameter(Mandatory=$true)][int]$ss)
-    #[string]$STDOUT_FILE = "$($CropFile)"
-    #$ArgumentList = "-hide_banner -ss $($ss) -i `"$($MovieFile)`" -vframes 10 -vf cropdetect -f null -"
-    #$STDOUT=(Execute-Command -commandTitle "ffmpeg" -commandPath ffmpeg -commandArguments $ArgumentList).stdout
-    #$ffmpegCommand="ffmpeg -hide_banner -ss `"$($ss)`" -i `"$($Movie)`" -vframes 10 -vf cropdetect -f null -"
-    #iex $ffmpegCommand > $STDOUT
     $STDOUT=ffmpeg -hide_banner -ss "$($ss)" -i "$($Movie)" -vframes 10 -vf cropdetect -f null - 2>&1
     $crop = ((($STDOUT[$STDOUT.length-4] | Out-String).Split(" "))[13]).Split("=")[1]
     return $crop
 }
 function Get-CropDimensions {
-    $crop = Measure-CropDimensions -ss 300
-    Write-Host "STDOUT: $($crop)"
-    $crop2 = $crop.split(":")[1]
-    $crop3 = $crop.split(":")[2]
-    $crop4 = $crop.split(":")[3]
-    $ss=15
+    <#$cropp1 = Measure-CropDimensions -ss 90
+    $cropp2 = Measure-CropDimensions -ss 150
+    $cropp3 = Measure-CropDimensions -ss 270
+    $cropQuestion = Read-Host "1: $($cropp1)`n2: $($cropp2)`n3: $($cropp3)`nOr type own crop dimensions: "
+    switch ($cropQuestion) {
+        1 {$crop=$cropp1}
+        2 {$crop=$cropp2}
+        3 {$crop=$cropp3}
+        Default {$crop=$CropQuestion}
+    }
+    return $crop#>
     $VideoWidth=$VideoInfo.Width
     $AR=$(1920/1080)
     $TnormalCrop4=$((($VideoWidth/$AR)-$crop2)/2)
     $normalCrop4="$($TnormalCrop4-10)..$($TnormalCrop4+10)"
 
-
-    while(!(($crop4 -In $($TnormalCrop4-10)..$($TnormalCrop4+10)) -or ($crop4 -In 0..10))){
+    $ss = 60
+    while((!(($crop4 -In $($TnormalCrop4-20)..$($TnormalCrop4+20)) -or ($crop4 -In 0..20)) -and ($ss -lt 270))){
         $crop = Measure-CropDimensions -ss $ss
         $crop2 = $crop.split(":")[1]
+        $crop3 = $crop.split(":")[2]
         $crop4 = $crop.split(":")[3]
         $TnormalCrop4=$((($VideoWidth/$AR)-$crop2)/2)
         $normalCrop4="$($TnormalCrop4-10)..$($TnormalCrop4+10)"
-        Write-Host "Width: $($VideoWidth)`ncrop4: $($crop4)`nTempCrop: $($TnormalCrop4)`nCrop: $($normalCrop4)`nSTDOUT: $($crop)"
+        Write-Host "Width: $($VideoWidth)`ncrop4: $($crop4)`nTempCrop: $($TnormalCrop4)`nCrop: $($normalCrop4)`nSTDOUT: $($crop)`nss: $($ss)"
         
         $ss=$ss+15
-        if($ss -ge 600){
-            $crop = "$($VideoInfo.Width):$($VideoInfo.Height):0:0"
-            $crop4 = 0
-        }
     }
-    $crop2 = $crop.split(":")[1]
-    $crop3 = $crop.split(":")[2]
     if($crop3 -ne 0){
         $crop = "$($VideoInfo.Width):$($crop2):0:$($crop4)"
     }
-    elseif(($crop4 -In 0..60)){
+    elseif(($crop4 -In 21..60)){
         $crop = "$($VideoInfo.Width):$($VideoInfo.Height):0:0"
-        $crop4 = $crop.split(":")[3]
     }
     return $crop
+    
 }
 #endregion
 
@@ -719,7 +717,7 @@ foreach ($Movie in $Movies){
 
         Remaining Movies: $($Remaining)"
         "$crop - $($Movie.BaseName)" | Out-File -Append $CropLog
-        Clear-Host
+        #Clear-Host
         Write-Host $info
         if($HLS){
             if(!(Test-Path "$($PathHLS)/$($Movie.BaseName)")){mkdir "$($PathHLS)/$($Movie.BaseName)" > $null}else{}
