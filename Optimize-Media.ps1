@@ -54,8 +54,8 @@
 
     .\Convert-Videos.ps1 -OriginalPath "C:\Input" `
                          -OptimizedPath "C:\Output" `
-                         -VideoCodec "libx264" -AudioCodec "aac" `
-                         -Bitrate2160p "12000k" -Bitrate1080p "5000k"
+                         -VideoCodec "libx264" -AudioCodec "ac3" `
+                         -Bitrate2160p "12000k" -Bitrate1080p "5M"
 
 .NOTES
     DE: Autor: github.com/htobi02 - Version: 0.1 - Erstellt: 2025-04-23
@@ -128,7 +128,110 @@ function Test-DoVi {
     }
 }
 
+function Convert-Video {
+    param (
+        [object]$InputFile,
+        [string]$OutputDirectory,
+        [string]$VideoCodec,
+        [string]$AudioCodec,
+        [hashtable]$BitrateMap
+    )
+    
+    $basename = $InputFile.BaseName.Split(".")[0]
+    $fullname = $InputFile.FullName
+
+    if (-not $VideoCodec) {
+        Write-Error "Fehlender VideoCodec. Abbruch."
+        return
+    }
+    if (-not $AudioCodec) {
+        Write-Error "Fehlender AudioCodec. Abbruch."
+        return
+    }
+
+    $isHDR = Test-IsHDR -VideoFile $fullname
+    $isDoVi = Test-DoVi -VideoFile $fullname
+
+    $needsTonemap = ($isHDR -or $isDoVi)
+    if ($needsTonemap) {
+        $tonemapFilter = "zscale=t=linear:npl=100,tonemap=hable,zscale=t=bt709,"
+    } else {
+        $tonemapFilter = ""
+    }
+    
+
+    # Filter & Mapping vorbereiten
+    $splitCount = 0
+    $Outputs = @()
+
+    foreach ($resolution in $BitrateMap.Keys) {
+        $bitrate = $BitrateMap[$resolution]
+        if (-not $bitrate) { continue }
+
+        $splitCount++
+
+        $width = switch ($resolution) {
+            "2160p" { 3840 }
+            "1440p" { 2560 }
+            "1080p" { 1920 }
+            "720p"  { 1280 }
+            "480p"  { 858 }
+        }
+
+        $Output = New-Object PSObject -property @{
+            id = $splitCount
+            filterOutput = "v$splitCount"
+            mapCommand = "-map [v$($splitCount)out] -c:v:$($splitCount-1) $VideoCodec -b:v:$($splitCount-1) $bitrate"
+            videoFilter = "[v$splitCount]scale=$($width):-2[v$($splitCount)out]"
+            outputFile  = "`"$OutputDirectory\$basename-$resolution.mkv`""
+        }
+        $Outputs += $Output
+    }
+
+    if ($splitCount -eq 0) {
+        Write-Host "Keine gültigen Bitraten angegeben. Überspringe $fullname." -ForegroundColor DarkGray
+        return
+    }
+
+    $filterComplex = "[0:v]${tonemapFilter}split=$splitCount$($Outputs.filterOutput | ForEach-Object { "[$_]" })$($Outputs.videoFilter | ForEach-Object { ";$_" })" -replace " ",""
+    
+    $mapAudio = "-map a -c:a $AudioCodec"
+    $mapSubtitles = "-map s -c:s copy"
+    $mapMetadata = "-map_metadata 0"
+
+    $cmd = "ffmpeg -hide_banner -loglevel error -y -stats -i `"$fullname`" -filter_complex `"$filterComplex`" "
+    foreach($Output in $Outputs){
+        $cmd += "$($Output.MapCommand) $mapAudio $mapSubtitles $mapMetadata $($Output.outputFile)"
+    }
+
+
+    Write-Host "Konvertiere: $basename mit $splitCount Version(en)..." -ForegroundColor Cyan
+    Write-Host $cmd -ForegroundColor DarkGray
+
+    Invoke-Expression $cmd
+}
+
+
+$bitrateMap = @{
+    "2160p" = $Bitrate2160p
+    "1440p" = $Bitrate1440p
+    "1080p" = $Bitrate1080p
+    "720p"  = $Bitrate720p
+    "480p"  = $Bitrate480p
+}
+
 $Files = Get-ChildItem -Path "$OriginalPath\*" -Recurse -Include *.mkv, *.mp4, *.avi, *.m4v | Sort-Object -Property Name
-foreach($File in $Files){
-    "Processing $($File.Name)"
+foreach ($File in $Files) {
+    "Processing $($File.BaseName)"
+    $OutputPath = $File.DirectoryName.Replace($OriginalPath,$OptimizedPath)
+    if (-not (Test-Path -Path $OutputPath)) {
+        New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
+    }
+    
+    Convert-Video -InputFile $File `
+                  -OutputDirectory $OutputPath `
+                  -VideoCodec $VideoCodec `
+                  -AudioCodec $AudioCodec `
+                  -BitrateMap $bitrateMap
+pause
 }
