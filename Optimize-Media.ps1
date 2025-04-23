@@ -25,3 +25,18 @@
     DE: Autor: github.com/htobi02 - Version: 0.1 - Erstellt: 2025-04-23
     EN: Author: github.com/htobi02 - Version: 0.1 - Created: 2025-04-23
 #>
+Param(
+    [parameter(Mandatory=$true)]
+    [String[]]
+    $OriginalPath,
+    [parameter(Mandatory=$true)]
+    [String[]]
+    $OptimizedPath,
+    $VideoCodec,
+    $AudioCodec,
+    $Bitrate2160p,
+    $Bitrate1440p,
+    $Bitrate1080p,
+    $Bitrate720p,
+    $Bitrate480p
+)
