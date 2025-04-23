@@ -12,6 +12,42 @@
         It supports different video/audio codecs and bitrates depending on the target resolution.
         Conversion is handled by ffmpeg and can be customized easily.
 
+.PARAMETER OriginalPath
+    DE: Pfad(e) zu den Quelldateien.
+    EN: Path(s) to the source video file(s).
+
+.PARAMETER OptimizedPath
+    DE: Pfad(e) fuer die Zieldateien nach Konvertierung.
+    EN: Path(s) for the converted output files.
+
+.PARAMETER VideoCodec
+    DE: Gewuenschter Videocodec (z.B. 'libx265', 'libx264').
+    EN: Desired video codec (e.g., 'libx265', 'libx264').
+
+.PARAMETER AudioCodec
+    DE: Gewuenschter Audiocodec (z.B. 'aac', 'copy').
+    EN: Desired audio codec (e.g., 'aac', 'copy').
+
+.PARAMETER Bitrate2160p
+    DE: Zielbitrate fuer 4K-Videos.
+    EN: Target bitrate for 4K (2160p) videos.
+
+.PARAMETER Bitrate1440p
+    DE: Zielbitrate fuer 1440p-Videos.
+    EN: Target bitrate for 1440p videos.
+
+.PARAMETER Bitrate1080p
+    DE: Zielbitrate fuer Full HD-Videos.
+    EN: Target bitrate for Full HD (1080p) videos.
+
+.PARAMETER Bitrate720p
+    DE: Zielbitrate fuer HD-Videos.
+    EN: Target bitrate for HD (720p) videos.
+
+.PARAMETER Bitrate480p
+    DE: Zielbitrate fuer SD-Videos.
+    EN: Target bitrate for SD (480p) videos.
+
 .EXAMPLE
     DE: Beispielaufruf (erstellt nur Versionen fuer 2160p und 1080p):
     EN: Example call (only creates versions for 2160p and 1080p):
