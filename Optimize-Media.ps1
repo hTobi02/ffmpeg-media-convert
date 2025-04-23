@@ -76,3 +76,55 @@ Param(
     $Bitrate720p,
     $Bitrate480p
 )
+
+function Test-IsHDR {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$VideoFile
+    )
+
+    $streamInfo = & ffprobe -show_streams -v error "$VideoFile" | Where-Object {
+        $_ -match '^color_transfer=|^color_space=|^color_primaries='
+    }
+
+    $COLORSPACE = $null
+    $COLORTRANSFER = $null
+    $COLORPRIMARIES = $null
+
+    foreach ($line in $streamInfo) {
+        if ($line -like "color_space=*") {
+            $COLORSPACE = $line -replace "color_space=", ""
+        } elseif ($line -like "color_transfer=*") {
+            $COLORTRANSFER = $line -replace "color_transfer=", ""
+        } elseif ($line -like "color_primaries=*") {
+            $COLORPRIMARIES = $line -replace "color_primaries=", ""
+        }
+    }
+
+    return ($COLORSPACE -eq "bt2020nc" -and $COLORTRANSFER -eq "smpte2084" -and $COLORPRIMARIES -eq "bt2020")
+}
+
+function Test-DoVi {
+    param (
+        [string]$VideoFile
+    )
+    
+    if (-Not (Test-Path $VideoFile)) {
+        Write-Host "Die angegebene Datei existiert nicht."
+        return
+    }
+
+    $output = & ffprobe -v error -select_streams v:0 -show_entries stream_tags -of default=noprint_wrappers=1:nokey=1 $VideoFile
+
+    if ($output -match "DOVI_Profile") {
+        if ($output -match "DOVI_Profile=dvhe\.05\.04") {
+            return $false
+        }
+        else {
+            return $true
+        }
+    } else {
+        return $false
+    }
+}
+
