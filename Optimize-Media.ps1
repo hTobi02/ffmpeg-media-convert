@@ -128,3 +128,7 @@ function Test-DoVi {
     }
 }
 
+$Files = Get-ChildItem -Path "$OriginalPath\*" -Recurse -Include *.mkv, *.mp4, *.avi, *.m4v | Sort-Object -Property Name
+foreach($File in $Files){
+    "Processing $($File.Name)"
+}
