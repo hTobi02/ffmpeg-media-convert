@@ -1,94 +1,60 @@
-# ffmpeg-media-convert
- Convert your Movie Media into multiple optimized Versions <br>
+# Convert-Videos.ps1
 
-## Info
-This Script creates multiple for Plex optimized versions from your Media Library.
-These are all implemented Versions which should be completely compatible with Plex:
-1. 8K HDR 50Mbit
-2. 4K HDR 20Mbit
-3. 2K HDR 14Mbit
-4. 1080p HDR 10Mbit
-5. 720p HDR 4Mbit
-6. SD HDR 1Mbit
-7. 8K SDR 30Mbit
-8. 4K SDR 12Mbit
-9. 2K SDR 10Mbit
-10. 1080p SDR 8Mbit
-11. 720p SDR 4Mbit
-12. SD SDR 1Mbit
+## Overview
 
-You can define all Bitrate settings with [parameters](#more-configoptions). 
+`Convert-Videos.ps1` is a PowerShell script designed to convert video files into multiple resolution-based quality levels with customizable video and audio codecs. It leverages `ffmpeg` to handle the conversions and supports High Dynamic Range (HDR) and Dolby Vision detection with automatic tone mapping when needed.
 
-### Attention
-Automatic selection of hwdecoding only tested with mac but should work also with nvidia. 
+---
 
-## Dependencies
-- [ffmpeg](https://ffmpeg.org)
-<!-->
-<br>the folowing dependencies are getting automatically downloaded/updated
-  - [hdr10plus_tool](https://github.com/quietvoid/hdr10plus_tool/releases/latest)
-  - [dovi_tool](https://github.com/quietvoid/dovi_tool/releases/latest)
--->
+## Features
 
-## Usage
-### powershell
+- Convert video files to multiple resolutions (2160p, 1440p, 1080p, 720p, 480p)
+- Customize video and audio codecs (e.g., `libx265`, `aac`)
+- Set individual bitrates for each resolution
+- Automatically detect HDR and Dolby Vision content
+- Apply tone mapping when required
+- Supports batch processing of video files
+- Retains audio and subtitle streams
+
+---
+
+## Requirements
+
+- **PowerShell 5.1+**
+- **ffmpeg** and **ffprobe** must be available in your system's `PATH`
+
+---
+
+## Parameters
+
+| Parameter       | Description                                                      |
+|----------------|------------------------------------------------------------------|
+| `OriginalPath` | Path(s) to the source video file(s)                              |
+| `OptimizedPath`| Path(s) for the converted output files                           |
+| `VideoCodec`   | Desired video codec (e.g., `libx265`, `libx264`)                 |
+| `AudioCodec`   | Desired audio codec (e.g., `aac`, `copy`)                        |
+| `Bitrate2160p` | Target bitrate for 4K (2160p) videos                             |
+| `Bitrate1440p` | Target bitrate for 1440p videos                                  |
+| `Bitrate1080p` | Target bitrate for Full HD (1080p) videos                        |
+| `Bitrate720p`  | Target bitrate for HD (720p) videos                              |
+| `Bitrate480p`  | Target bitrate for SD (480p) videos                              |
+
+---
+
+## Example Usage
+
+Convert videos in `C:\Input` to 2160p and 1080p using H.264 and AC3:
+
 ```powershell
-pwsh ./app.ps1 -MoviePath /PATH/TO/YOUR/MOVIES -NewPath /PATH/FOR/CONVERTED
+.\Convert-Videos.ps1 -OriginalPath "C:\Input" `
+                     -OptimizedPath "C:\Output" `
+                     -VideoCodec "libx264" `
+                     -AudioCodec "ac3" `
+                     -Bitrate2160p "12000k" `
+                     -Bitrate1080p "5M"
 ```
-<!-->
-### Docker
-```docker
-docker run -d \
--e MOVIEPATH=/movies \
--e NEWPATH=/converted \
--v /PATH/TO/MOVIES:/movies \
--v /PATH/FOR/CONVERTED:/converted \
-htobi02/ffmpeg-media-convert:alpine
-```
--->
 
-### More Configoptions:
-Parameter|Description|Default
-|---|---|---|
--codec|choose videocodec|hevc
--audiocodec|choose audiocodec|copy
--HDRTonemapOnly|Convert HDR content only tonemapped to SDR|$false
--HDRTonemap|Convert HDR content to HDR and SDR (not recommended)|$false
--HLS|Convert input into HLS streamable media|$false
--MergeCDs|Merge files named "CD[1-9]"|$false
--MergeOnly|Only merge files named "CD[1-9]"|$false
--SkipCrop|Skip Crop Measuring|$false
--SkipHDR10PlusCheck|Dont use [hdr10plus_tool](https://github.com/quietvoid/hdr10plus_tool/releases/latest) |$false
--SkipDolbyVisionCheck|Dont use [dovi_tool](https://github.com/quietvoid/dovi_tool/releases/latest) |$false
-|<b>Resolution</b>||||
--No8K|Doesn't convert source to 8K|$false
--No4K|Doesn't convert source to 4K|$false
--No2K|Doesn't convert source to 2K|$false
--NoFHD|Doesn't convert source to FHD|$false
--NoHD|Doesn't convert source to HD|$false
--NoSD|Doesn't convert source to SD|$false
-|<b>Bitrate Settings</b>||||
--bitrate8khdr|Bitrate for 8K HDR Content|50M
--bitrate4khdr|Bitrate for 4K HDR Content|20M
--bitrate4khdr|Bitrate for 2K HDR Content|15M
--bitratefhdhdr|Bitrate for 1080p HDR Content|10M
--bitratehdhdr|Bitrate for 720p HDR Content|4M
--bitratesdhdr|Bitrate for SD HDR Content|1M
--bitrate8k|Bitrate for 8K SDR Content|15M
--bitrate4k|Bitrate for 4K SDR Content|12M
--bitrate2k|Bitrate for 2K SDR Content|10M
--bitratefhd|Bitrate for 1080p SDR Content|8M
--bitratehd|Bitrate for 720p SDR Content|4M
--bitratesd|Bitrate for SD SDR Content|1M
+## Notes
+The script detects HDR (bt2020 / PQ) and Dolby Vision (DOVI_Profile) content and applies appropriate tone mapping.
 
-## Progress
-- ~~Overhaul code~~
-- ~~fixing bugs~~
-- ~~Depencency Check~~
-- ~~Auto Update/Download Depencencies~~
-- ~~[create Docker Container](https://hub.docker.com/r/htobi02/ffmpeg-media-convert)~~
-- ~~add HLS output~~
-- ~~Auto Select Codec if no Parameter was set~~
-- ~~Use Hardwaredecoding if Devices present~
-- ~~Merge Files with "CD[X]" in Name~~
-- Add TMDB Year for Movies without date in Name
+Output files will be saved in the mirrored folder structure inside OptimizedPath.
