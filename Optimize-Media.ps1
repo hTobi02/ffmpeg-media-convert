@@ -110,19 +110,14 @@ function Test-DoVi {
     )
     
     if (-Not (Test-Path $VideoFile)) {
-        Write-Host "Die angegebene Datei existiert nicht."
+        Write-Host "Video File not found: $VideoFile" -ForegroundColor Red
         return
     }
-
-    $output = & ffprobe -v error -select_streams v:0 -show_entries stream_tags -of default=noprint_wrappers=1:nokey=1 $VideoFile
-
-    if ($output -match "DOVI_Profile") {
-        if ($output -match "DOVI_Profile=dvhe\.05\.04") {
-            return $false
-        }
-        else {
-            return $true
-        }
+    $dvData = (& ffprobe -v error -select_streams v:0 -show_streams -show_format -of json $VideoFile | ConvertFrom-Json).streams.side_data_list
+    
+    # Ausgabe
+    if ($dvData) {
+        return $dvData
     } else {
         return $false
     }
@@ -141,19 +136,21 @@ function Convert-Video {
     $fullname = $InputFile.FullName
 
     if (-not $VideoCodec) {
-        Write-Error "Fehlender VideoCodec. Abbruch."
+        Write-Error "Missing video codec. Abort." -ForegroundColor Red
         return
     }
     if (-not $AudioCodec) {
-        Write-Error "Fehlender AudioCodec. Abbruch."
+        Write-Error "Missing audio codec. Abort." -ForegroundColor Red
         return
     }
 
     $isHDR = Test-IsHDR -VideoFile $fullname
     $isDoVi = Test-DoVi -VideoFile $fullname
 
-    $needsTonemap = ($isHDR -or $isDoVi)
-    if ($needsTonemap) {
+    if ($isDoVi.dv_profile -ne 5) {
+        Write-Error "Unsupported DoVi profile: $($isDoVi.dv_profile)" -ForegroundColor Red
+        return
+    } elseif ($isHDR) {
         $tonemapFilter = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,"
     } else {
         $tonemapFilter = ""
@@ -189,7 +186,7 @@ function Convert-Video {
     }
 
     if ($splitCount -eq 0) {
-        Write-Host "Keine gültigen Bitraten angegeben. Überspringe $fullname." -ForegroundColor DarkGray
+        Write-Host "No valid bit rates specified. Skipping $fullname." -ForegroundColor DarkGray
         return
     }
 
@@ -205,7 +202,7 @@ function Convert-Video {
     }
 
 
-    Write-Host "Konvertiere: $basename mit $splitCount Version(en)..." -ForegroundColor Cyan
+    Write-Host "Convert: $basename with $splitCount version(s)..." -ForegroundColor Cyan
     Write-Host $cmd -ForegroundColor DarkGray
 
     Invoke-Expression $cmd
