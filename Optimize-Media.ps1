@@ -82,6 +82,11 @@ function Test-IsHDR {
         [Parameter(Mandatory=$true)]
         [string]$VideoFile
     )
+    
+    if (-Not (Test-Path $VideoFile)) {
+        Write-Host "Video File not found: $VideoFile" -ForegroundColor Red
+        return
+    }
 
     $streamInfo = & ffprobe -show_streams -v error "$VideoFile" | Where-Object {
         $_ -match '^color_transfer=|^color_space=|^color_primaries='
@@ -106,6 +111,7 @@ function Test-IsHDR {
 
 function Test-DoVi {
     param (
+        [Parameter(Mandatory=$true)]
         [string]$VideoFile
     )
     
@@ -136,19 +142,19 @@ function Convert-Video {
     $fullname = $InputFile.FullName
 
     if (-not $VideoCodec) {
-        Write-Error "Missing video codec. Abort." -ForegroundColor Red
+        Write-Host "Missing video codec. Abort." -ForegroundColor Red
         return
     }
     if (-not $AudioCodec) {
-        Write-Error "Missing audio codec. Abort." -ForegroundColor Red
+        Write-Host "Missing audio codec. Abort." -ForegroundColor Red
         return
     }
 
     $isHDR = Test-IsHDR -VideoFile $fullname
     $isDoVi = Test-DoVi -VideoFile $fullname
 
-    if ($isDoVi.dv_profile -ne 5) {
-        Write-Error "Unsupported DoVi profile: $($isDoVi.dv_profile)" -ForegroundColor Red
+    if ($isDoVi.dv_profile -eq 5) {
+        Write-Host "Unsupported DoVi profile: $($isDoVi.dv_profile)" -ForegroundColor Red
         return
     } elseif ($isHDR) {
         $tonemapFilter = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,"
@@ -156,6 +162,12 @@ function Convert-Video {
         $tonemapFilter = ""
     }
     
+    # Auflösung des Quellvideos ermitteln
+    $videoStream = & ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$fullname"
+    $videoWidth, $videoHeight = $videoStream -split ","
+    $videoWidth = [int]$videoWidth
+    $videoHeight = [int]$videoHeight
+
 
     # Filter & Mapping vorbereiten
     $splitCount = 0
@@ -165,8 +177,6 @@ function Convert-Video {
         $bitrate = $BitrateMap[$resolution]
         if (-not $bitrate) { continue }
 
-        $splitCount++
-
         $width = switch ($resolution) {
             "2160p" { 3840 }
             "1440p" { 2560 }
@@ -174,6 +184,12 @@ function Convert-Video {
             "720p"  { 1280 }
             "480p"  { 858 }
         }
+        if($width -gt $videoWidth){
+            Write-Host "Target ($width) bigger than the original resolution ($videoWidth). Skipping $resolution..." -ForegroundColor Yellow
+            continue
+        }
+
+        $splitCount++
 
         $Output = New-Object PSObject -property @{
             id = $splitCount
