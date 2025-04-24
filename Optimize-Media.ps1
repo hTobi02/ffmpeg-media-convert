@@ -129,6 +129,31 @@ function Test-DoVi {
     }
 }
 
+function Convert-BitrateToBps {
+    param (
+        [Parameter(Mandatory)]
+        [string]$Bitrate
+    )
+
+    # Bereinige Whitespace
+    $Bitrate = $Bitrate.Trim()
+
+    # Prüfe und konvertiere die Einheit
+    if ($Bitrate -match '^(\d+)([kKmM]?)$') {
+        $value = [int]$matches[1]
+        $unit = $matches[2].ToLower()
+
+        switch ($unit) {
+            'k' { return $value * 1000 }
+            'm' { return $value * 1000000 }
+            default { return $value }
+        }
+    }
+    else {
+        throw "Ungültiges Bitratenformat: '$Bitrate'"
+    }
+}
+
 function Convert-Video {
     param (
         [object]$InputFile,
@@ -168,6 +193,8 @@ function Convert-Video {
     $videoWidth = [int]$videoWidth
     $videoHeight = [int]$videoHeight
 
+    $duration, $filesize = (& ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$fullname") -split ","
+    $videoBitrate = $filesize/($duration/60*0.0075)/1000
 
     # Filter & Mapping vorbereiten
     $splitCount = 0
@@ -176,6 +203,7 @@ function Convert-Video {
     foreach ($resolution in $BitrateMap.Keys) {
         $bitrate = $BitrateMap[$resolution]
         if (-not $bitrate) { continue }
+        if((Convert-BitrateToBps -Bitrate $bitrate) -ge $videoBitrate) { Write-Host "Final File might be bigger than original. Skipping..." -ForegroundColor Yellow; continue }
 
         $width = switch ($resolution) {
             "2160p" { 3840 }
