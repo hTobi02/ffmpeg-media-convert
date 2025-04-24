@@ -101,7 +101,7 @@ function Test-IsHDR {
         }
     }
 
-    return ($COLORSPACE -eq "bt2020nc" -and $COLORTRANSFER -eq "smpte2084" -and $COLORPRIMARIES -eq "bt2020")
+    return ($COLORSPACE -eq "bt2020nc" -and $COLORPRIMARIES -eq "bt2020" -and (($COLORTRANSFER -eq "smpte2084") -or ($COLORTRANSFER -eq "smpte2086") -or ($COLORTRANSFER -like "bt2020*") -or ($COLORTRANSFER -eq "arib-std-b67")))
 }
 
 function Test-DoVi {
@@ -154,7 +154,7 @@ function Convert-Video {
 
     $needsTonemap = ($isHDR -or $isDoVi)
     if ($needsTonemap) {
-        $tonemapFilter = "zscale=t=linear:npl=100,tonemap=hable,zscale=t=bt709,"
+        $tonemapFilter = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,"
     } else {
         $tonemapFilter = ""
     }
@@ -183,7 +183,7 @@ function Convert-Video {
             filterOutput = "v$splitCount"
             mapCommand = "-map [v$($splitCount)out] -c:v:$($splitCount-1) $VideoCodec -b:v:$($splitCount-1) $bitrate"
             videoFilter = "[v$splitCount]scale=$($width):-2[v$($splitCount)out]"
-            outputFile  = "`"$OutputDirectory\$basename-$resolution.mkv`""
+            outputFile  = "`"$OutputDirectory/$($basename).$resolution.mkv`""
         }
         $Outputs += $Output
     }
@@ -220,7 +220,7 @@ $bitrateMap = @{
     "480p"  = $Bitrate480p
 }
 
-$Files = Get-ChildItem -Path "$OriginalPath\*" -Recurse -Include *.mkv, *.mp4, *.avi, *.m4v | Sort-Object -Property Name
+$Files = Get-ChildItem -Path "$OriginalPath/*" -Recurse -Include *.mkv, *.mp4, *.avi, *.m4v | Sort-Object -Property Name
 foreach ($File in $Files) {
     "Processing $($File.BaseName)"
     $OutputPath = $File.DirectoryName.Replace($OriginalPath,$OptimizedPath)
@@ -229,9 +229,8 @@ foreach ($File in $Files) {
     }
     
     Convert-Video -InputFile $File `
-                  -OutputDirectory $OutputPath `
-                  -VideoCodec $VideoCodec `
-                  -AudioCodec $AudioCodec `
-                  -BitrateMap $bitrateMap
-pause
+        -OutputDirectory $OutputPath `
+        -VideoCodec $VideoCodec `
+        -AudioCodec $AudioCodec `
+        -BitrateMap $bitrateMap
 }

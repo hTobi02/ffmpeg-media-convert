@@ -32,7 +32,7 @@
 | `OriginalPath` | Path(s) to the source video file(s)                              |
 | `OptimizedPath`| Path(s) for the converted output files                           |
 | `VideoCodec`   | Desired video codec (e.g., `libx265`, `libx264`)                 |
-| `AudioCodec`   | Desired audio codec (e.g., `aac`, `copy`)                        |
+| `AudioCodec`   | Desired audio codec (e.g., `ac3`, `copy`)                        |
 | `Bitrate2160p` | Target bitrate for 4K (2160p) videos                             |
 | `Bitrate1440p` | Target bitrate for 1440p videos                                  |
 | `Bitrate1080p` | Target bitrate for Full HD (1080p) videos                        |
