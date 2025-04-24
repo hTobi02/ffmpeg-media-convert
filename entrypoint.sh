@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 set -e
 
@@ -8,7 +8,7 @@ add_param() {
   VAR_NAME="$1"
   VAR_VALUE="$2"
   if [ -n "$VAR_VALUE" ]; then
-    PARAMS+=" -$VAR_NAME '$VAR_VALUE'"
+    PARAMS="$PARAMS -$VAR_NAME '$VAR_VALUE'"
   fi
 }
 
@@ -26,4 +26,5 @@ add_param "Bitrate720p" "$BITRATE_720P"
 add_param "Bitrate480p" "$BITRATE_480P"
 
 # Run PowerShell script with built params
-pwsh -File ./Convert-Videos.ps1 $PARAMS
+eval "pwsh -File '/app/Optimize-Media.ps1' $PARAMS"
+

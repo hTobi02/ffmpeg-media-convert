@@ -29,6 +29,8 @@ COPY --from=mwader/static-ffmpeg:7.1.1 /ffprobe /usr/local/bin/
 
 WORKDIR /app
 COPY entrypoint.sh .
-RUN chmod +x ./entrypoint.sh
+COPY Optimize-Media.ps1 .
+RUN chmod +x ./entrypoint.sh && \
+    chmod +x ./Optimize-Media.ps1
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/bin/sh","/app/entrypoint.sh"]
