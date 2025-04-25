@@ -210,7 +210,7 @@ function Convert-Video {
             return
         } elseif ($isHDR) {
             $tonemapFilter = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,"
-            $HDRTagsRegex = '\[(DV\s+)?(HDR10?(\+|Plus)?|DV|HDR|HDR10Plus)\]'
+            $HDRTagsRegex = '\[(DV\s+)?(HDR|HDR10|HDR10Plus?(\+|Plus)?|DV|HDR|HDR10|HDR10Plus)\]'
             $optimizedName = $basename -replace $HDRTagsRegex, ''
         } else {
             $tonemapFilter = ""
