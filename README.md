@@ -43,15 +43,28 @@
 
 ## Example Usage
 
-Convert videos in `C:\Input` to 2160p and 1080p using H.264 and AC3:
+Convert videos in `C:\Input` to 2160p and 1080p using H.264 while copying the original audio codec:
 
 ```powershell
 .\Convert-Videos.ps1 -OriginalPath "C:\Input" `
                      -OptimizedPath "C:\Output" `
                      -VideoCodec "libx264" `
-                     -AudioCodec "ac3" `
+                     -AudioCodec "copy" `
                      -Bitrate2160p "12000k" `
                      -Bitrate1080p "5M"
+```
+
+<br>
+
+Convert videos in `C:\Input` to 1080p, 720p and 480p using AV1 with NVIDIA Encoding and AC3 for audio:
+```powershell
+.\Optimize-Media.ps1 -OriginalPath "C:\Input" `
+                     -OptimizedPath "C:\Output" `
+                     -VideoCodec av1_nvenc `
+                     -AudioCodec ac3 `
+                     -Bitrate480p 400k `
+                     -Bitrate720p 1500k `
+                     -Bitrate1080p 4M
 ```
 
 ## Notes
