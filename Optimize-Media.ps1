@@ -271,7 +271,7 @@ function Convert-Video {
         $Output = New-Object PSObject -property @{
             id = $splitCount
             filterOutput = "v$splitCount"
-            mapCommand = "-map [v$($splitCount)out] -c:v:$($splitCount-1) $VideoCodec -b:v:$($splitCount-1) $bitrate"
+            mapCommand = "-map [v$($splitCount)out] -c:v $VideoCodec -b:v $bitrate"
             videoFilter = "[v$splitCount]scale=$($width):-2[v$($splitCount)out]"
             outputFile = "$OutputDirectory/$($outputName).mkv"
             
