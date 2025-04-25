@@ -62,12 +62,8 @@
     EN: Author: github.com/htobi02 - Version: 0.1 - Created: 2025-04-23
 #>
 Param(
-    [parameter(Mandatory=$true)]
-    [String[]]
-    $OriginalPath,
-    [parameter(Mandatory=$true)]
-    [String[]]
-    $OptimizedPath,
+    [parameter(Mandatory=$true)][String[]]$OriginalPath,
+    [parameter(Mandatory=$true)][String[]]$OptimizedPath,
     $VideoCodec,
     $AudioCodec,
     $Bitrate2160p,
