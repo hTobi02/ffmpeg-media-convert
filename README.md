@@ -6,6 +6,11 @@
 
 ---
 
+## Read Before Use
+Your Video Files should use the naming convention recommended by [TRaSH-Guides](https://trash-guides.info/Radarr/Radarr-recommended-naming-scheme/#standard-movie-format).<br>
+This includes formats like `[Bluray-1080p]`, `[Bluray-1080p Proper]`, `[Bluray-1080p Real]`, or similar, to ensure proper file optimization and handling by the script.<br>
+While you can still try to execute the script with other formats, please note that its functionality has only been fully tested with the recommended naming convention.
+
 ## Features
 
 - Convert video files to multiple resolutions (2160p, 1440p, 1080p, 720p, 480p)
