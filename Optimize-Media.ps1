@@ -80,7 +80,7 @@ function Test-IsHDR {
         [string]$VideoFile
     )
     
-    if (-Not (Test-Path $VideoFile)) {
+    if (-Not (Test-Path $($VideoFile.Replace("[","``[").Replace("]","``]")))) {
         Write-Host "Video File not found: $VideoFile" -ForegroundColor Red
         return
     }
@@ -112,7 +112,7 @@ function Test-DoVi {
         [string]$VideoFile
     )
     
-    if (-Not (Test-Path $VideoFile)) {
+    if (-Not (Test-Path $($VideoFile.Replace("[","``[").Replace("]","``]")))) {
         Write-Host "Video File not found: $VideoFile" -ForegroundColor Red
         return
     }
@@ -161,7 +161,7 @@ function Convert-Video {
         [boolean]$DenyTonemap
     )
     
-    $basename = $InputFile.BaseName.Split(".")[0]
+    $basename = $InputFile.BaseName
     $fullname = $InputFile.FullName
 
     if (-not $VideoCodec) {
@@ -192,10 +192,11 @@ function Convert-Video {
     }
     
     # Auflösung des Quellvideos ermitteln
-    $videoStream = & ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$fullname"
+    $videoStream = Invoke-Expression "ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 `"$fullname`""
     $videoWidth, $videoHeight = $videoStream -split ","
+
     $videoWidth = [int]$videoWidth
-    $videoHeight = [int]$videoHeight
+    $videoHeight = [int]$videoHeight[0]
 
     $duration, $filesize = (& ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$fullname") -split ","
     $videoBitrate = $filesize/($duration/60*0.0075)/1000
