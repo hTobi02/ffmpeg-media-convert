@@ -85,7 +85,7 @@ function Test-IsHDR {
         return
     }
 
-    $streamInfo = & ffprobe -show_streams -v error "$VideoFile" | Where-Object {
+    $streamInfo = & ffprobe -select_streams v:0 -show_streams -v error "$VideoFile" | Where-Object {
         $_ -match '^color_transfer=|^color_space=|^color_primaries='
     }
 
@@ -151,6 +151,33 @@ function Convert-BitrateToBps {
     }
 }
 
+function Get-AudioInfo {
+    param ([string]$File)
+    $audioStream = & ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,profile,channel_layout -of default=nw=1:nk=1 "$File"
+    $audioInfo = $audioStream -split "`n"
+    return @{
+        codec = $audioInfo[0]
+        profile = $audioInfo[1]
+        layout = $audioInfo[2]
+    }
+}
+
+function Convert-AudioTag {
+    param ([string]$Codec)
+
+    switch -Regex ($Codec.ToLower()) {
+        'aac'             { return 'AAC' }
+        'ac3'             { return 'AC3' }
+        'eac3'            { return 'EAC3' }
+        'dts'             { return 'DTS' }
+        'dts_hd'          { return 'DTS-HD MA' }
+        'truehd'          { return 'TrueHD' }
+        'truehd_atmos'    { return 'TrueHD Atmos' }
+        default           { return $Codec.ToUpper() }
+    }
+}
+
+
 function Convert-Video {
     param (
         [object]$InputFile,
@@ -200,6 +227,10 @@ function Convert-Video {
 
     $duration, $filesize = (& ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$fullname") -split ","
     $videoBitrate = $filesize/($duration/60*0.0075)/1000
+
+    # AudioInfos ermitteln
+    $AudioInfo = Get-AudioInfo -File $fullname
+    $optimizedName = $optimizedName -replace "$($AudioInfo.profile)","$(Convert-AudioTag -Codec ac3)"
 
     # Filter & Mapping vorbereiten
     $splitCount = 0
