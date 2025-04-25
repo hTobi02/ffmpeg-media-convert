@@ -217,6 +217,15 @@ function Convert-Video {
             "720p"  { 1280 }
             "480p"  { 858 }
         }
+
+        switch -Regex ($VideoCodec) {
+            '264'          { $codecTag = 'x264' ; break }
+            '265'          { $codecTag = 'x265' ; break }
+            'hevc'         { $codecTag = 'x265' ; break }
+            'av1'          { $codecTag = 'av1'  ; break }
+            default        { $codecTag = 'unknown' }
+        }
+
         if($width -gt $videoWidth){
             Write-Host "Target ($width) bigger than the original resolution ($videoWidth). Skipping $resolution..." -ForegroundColor Yellow
             continue
@@ -224,12 +233,17 @@ function Convert-Video {
 
         $splitCount++
 
+        # Optimierter Dateiname
+        $outputName = $optimizedName -replace '\[(Bluray|WEBDL|WEB|Remux|HDTV|DVDRip|BRRip)-\d+p\]', "[Optimized-$resolution]"
+        $outputName = $outputName -replace '\[x\d+\]|\[x265\]|\[x264\]|\[av1\]', "[$codecTag]"
+
         $Output = New-Object PSObject -property @{
             id = $splitCount
             filterOutput = "v$splitCount"
             mapCommand = "-map [v$($splitCount)out] -c:v:$($splitCount-1) $VideoCodec -b:v:$($splitCount-1) $bitrate"
             videoFilter = "[v$splitCount]scale=$($width):-2[v$($splitCount)out]"
-            outputFile  = "`"$OutputDirectory/$($basename).$resolution.mkv`""
+            outputFile = "$OutputDirectory/$($outputName).mkv"
+            
         }
         $Outputs += $Output
     }
@@ -247,7 +261,7 @@ function Convert-Video {
 
     $cmd = "ffmpeg -hide_banner -loglevel error -n -stats -i `"$fullname`" -filter_complex `"$filterComplex`" "
     foreach($Output in $Outputs){
-        $cmd += "$($Output.MapCommand) $mapAudio $mapSubtitles $mapMetadata $($Output.outputFile)"
+        $cmd += "$($Output.MapCommand) $mapAudio $mapSubtitles $mapMetadata `"$($Output.outputFile)`" "
     }
 
 
@@ -273,7 +287,7 @@ foreach ($File in $Files) {
     if (-not (Test-Path -Path $OutputPath)) {
         New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null
     }
-    
+
     Convert-Video -InputFile $File `
         -OutputDirectory $OutputPath `
         -VideoCodec $VideoCodec `
