@@ -74,7 +74,8 @@ Param(
     $Bitrate1440p,
     $Bitrate1080p,
     $Bitrate720p,
-    $Bitrate480p
+    $Bitrate480p,
+    [boolean]$DenyTonemap
 )
 
 function Test-IsHDR {
@@ -160,7 +161,8 @@ function Convert-Video {
         [string]$OutputDirectory,
         [string]$VideoCodec,
         [string]$AudioCodec,
-        [hashtable]$BitrateMap
+        [hashtable]$BitrateMap,
+        [boolean]$DenyTonemap
     )
     
     $basename = $InputFile.BaseName.Split(".")[0]
@@ -175,16 +177,22 @@ function Convert-Video {
         return
     }
 
-    $isHDR = Test-IsHDR -VideoFile $fullname
-    $isDoVi = Test-DoVi -VideoFile $fullname
+    if(!($DenyTonemap)){
+        $isHDR = Test-IsHDR -VideoFile $fullname
+        $isDoVi = Test-DoVi -VideoFile $fullname
 
-    if ($isDoVi.dv_profile -eq 5) {
-        Write-Host "Unsupported DoVi profile: $($isDoVi.dv_profile)" -ForegroundColor Red
-        return
-    } elseif ($isHDR) {
-        $tonemapFilter = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,"
-    } else {
-        $tonemapFilter = ""
+        if ($isDoVi.dv_profile -eq 5) {
+            Write-Host "Unsupported DoVi profile: $($isDoVi.dv_profile)" -ForegroundColor Red
+            $optimizedName = $basename
+            return
+        } elseif ($isHDR) {
+            $tonemapFilter = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,"
+            $HDRTagsRegex = '\[(DV\s+)?(HDR10?(\+|Plus)?|DV|HDR|HDR10Plus)\]'
+            $optimizedName = $basename -replace $HDRTagsRegex, ''
+        } else {
+            $tonemapFilter = ""
+            $optimizedName = $basename
+        }
     }
     
     # Auflösung des Quellvideos ermitteln
