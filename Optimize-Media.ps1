@@ -257,7 +257,7 @@ function Convert-Video {
     
     $mapAudio = "-map a -c:a $AudioCodec"
     $mapSubtitles = "-map s -c:s copy"
-    $mapMetadata = "-map_metadata 0"
+    $mapMetadata = "-map_metadata 0 -map_chapters 0"
 
     $cmd = "ffmpeg -hide_banner -loglevel error -n -stats -i `"$fullname`" -filter_complex `"$filterComplex`" "
     foreach($Output in $Outputs){
