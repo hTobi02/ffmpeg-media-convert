@@ -58,8 +58,8 @@
                          -Bitrate2160p "12000k" -Bitrate1080p "5M"
 
 .NOTES
-    DE: Autor: github.com/htobi02 - Version: 0.1 - Erstellt: 2025-04-23
-    EN: Author: github.com/htobi02 - Version: 0.1 - Created: 2025-04-23
+    DE: Autor: github.com/htobi02 - Version: 0.2 - Erstellt: 2025-04-23
+    EN: Author: github.com/htobi02 - Version: 0.2 - Created: 2025-04-23
 #>
 Param(
     [parameter(Mandatory=$true)][String[]]$OriginalPath,
