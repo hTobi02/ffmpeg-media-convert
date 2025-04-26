@@ -82,10 +82,8 @@ Convert videos in C:\Input to 1080p, 720p and 480p using AV1 and disable tone ma
 ```
 
 ## Notes
-HDR (BT.2020 with PQ transfer) and Dolby Vision content are detected via ffprobe.
-
-Tone mapping from HDR to SDR will be applied automatically unless -DenyTonemap is set to $true.
-
-Output files will retain folder structure under OptimizedPath.
+- HDR (BT.2020 with PQ transfer) and Dolby Vision content are detected via ffprobe.
+- Tone mapping from HDR to SDR will be applied automatically unless -DenyTonemap is set to $true.
+- Output files will retain folder structure under OptimizedPath.
 
 ---
