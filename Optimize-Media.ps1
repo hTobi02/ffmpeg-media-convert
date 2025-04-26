@@ -28,6 +28,18 @@
     DE: Gewuenschter Audiocodec (z.B. 'aac', 'copy').
     EN: Desired audio codec (e.g., 'aac', 'copy').
 
+.PARAMETER Bitrate4320p
+    DE: Zielbitrate fuer 8K-Videos.
+    EN: Target bitrate for 8K (4320p) videos.
+
+.PARAMETER Bitrate3456p
+    DE: Zielbitrate fuer 6K-Videos.
+    EN: Target bitrate for 6K (3456p) videos.
+
+.PARAMETER Bitrate2880p
+    DE: Zielbitrate fuer 5K-Videos.
+    EN: Target bitrate for 5K (2880p) videos.
+
 .PARAMETER Bitrate2160p
     DE: Zielbitrate fuer 4K-Videos.
     EN: Target bitrate for 4K (2160p) videos.
@@ -47,6 +59,10 @@
 .PARAMETER Bitrate480p
     DE: Zielbitrate fuer SD-Videos.
     EN: Target bitrate for SD (480p) videos.
+
+.PARAMETER DenyTonemap
+    DE: Verhindere, dass HDR zu SDR gefiltert wird.
+    EN: Prevent HDR from being filtered to SDR.
 
 .EXAMPLE
     DE: Beispielaufruf (erstellt nur Versionen fuer 2160p und 1080p):
