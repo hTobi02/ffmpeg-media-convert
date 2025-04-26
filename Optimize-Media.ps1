@@ -66,6 +66,9 @@ Param(
     [parameter(Mandatory=$true)][String[]]$OptimizedPath,
     $VideoCodec,
     $AudioCodec,
+    $Bitrate4320p,
+    $Bitrate3456p,
+    $Bitrate2880p,
     $Bitrate2160p,
     $Bitrate1440p,
     $Bitrate1080p,
@@ -242,6 +245,9 @@ function Convert-Video {
         if((Convert-BitrateToBps -Bitrate $bitrate) -ge $videoBitrate) { Write-Host "Final File might be bigger than original. Skipping..." -ForegroundColor Yellow; continue }
 
         $width = switch ($resolution) {
+            "4320p" { 7680 }
+            "3456p" { 6144 }
+            "2880p" { 5120 }
             "2160p" { 3840 }
             "1440p" { 2560 }
             "1080p" { 1920 }
@@ -304,6 +310,9 @@ function Convert-Video {
 
 
 $bitrateMap = @{
+    "4320p" = $Bitrate4320p
+    "3456p" = $Bitrate3456p
+    "2880p" = $Bitrate2880p
     "2160p" = $Bitrate2160p
     "1440p" = $Bitrate1440p
     "1080p" = $Bitrate1080p
