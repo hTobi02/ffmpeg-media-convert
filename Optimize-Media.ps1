@@ -309,7 +309,7 @@ function Convert-Video {
     $filterComplex = "[0:v]${tonemapFilter}split=$splitCount$($Outputs.filterOutput | ForEach-Object { "[$_]" })$($Outputs.videoFilter | ForEach-Object { ";$_" })" -replace " ",""
     
     $mapAudio = "-map a -c:a $AudioCodec"
-    $mapSubtitles = "-map s -c:s copy"
+    $mapSubtitles = "-map s? -c:s copy"
     $mapMetadata = "-map_metadata 0 -map_chapters 0"
 
     $cmd = "ffmpeg -hide_banner -loglevel error -n -stats -i `"$fullname`" -filter_complex `"$filterComplex`" "
