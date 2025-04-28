@@ -247,9 +247,12 @@ function Convert-Video {
     $duration, $filesize = (& ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$fullname") -split ","
     $videoBitrate = $filesize/($duration/60*0.0075)/1000
 
-    # AudioInfos ermitteln
-    $AudioInfo = Get-AudioInfo -File $fullname
-    $optimizedName = $optimizedName -replace "$($AudioInfo.profile)","$(Convert-AudioTag -Codec ac3)"
+    if($AudioCodec -ne "copy"){
+        # AudioInfos ermitteln
+        $AudioInfo = Get-AudioInfo -File $fullname
+        if(($AudioInfo.profile) -eq "unknown"){$AudioReplace = $AudioInfo.codec.toUpper()} else {$AudioReplace = $AudioInfo.profile}
+        $optimizedName = $optimizedName -replace "$($AudioReplace)","$(Convert-AudioTag -Codec $AudioCodec)"
+    }
 
     # Filter & Mapping vorbereiten
     $splitCount = 0
