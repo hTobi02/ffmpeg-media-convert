@@ -315,7 +315,10 @@ function Convert-Video {
     $mapSubtitles = "-map s? -c:s copy"
     $mapMetadata = "-map_metadata 0 -map_chapters 0"
 
-    $cmd = "ffmpeg -hide_banner -loglevel error -n -stats -ss 00:10:00 -to 00:10:30 -i `"$fullname`" -filter_complex `"$filterComplex`" "
+    $debug=""
+    #$debug=" -ss 00:10:00 -to 00:10:30"
+
+    $cmd = "ffmpeg -hide_banner -loglevel error -n -stats$debug -i `"$fullname`" -filter_complex `"$filterComplex`" "
     foreach($Output in $Outputs){
         $cmd += "$($Output.MapCommand) $mapAudio $mapSubtitles $mapMetadata `"$($Output.outputFile)`" "
     }

@@ -19,11 +19,15 @@ add_param "OptimizedPath" "$OPTIMIZED_PATH"
 # Optional
 add_param "VideoCodec" "$VIDEO_CODEC"
 add_param "AudioCodec" "$AUDIO_CODEC"
+add_param "Bitrate4320p" "$BITRATE_4320P"
+add_param "Bitrate3456p" "$BITRATE_3456P"
+add_param "Bitrate2880p" "$BITRATE_2880P"
 add_param "Bitrate2160p" "$BITRATE_2160P"
 add_param "Bitrate1440p" "$BITRATE_1440P"
 add_param "Bitrate1080p" "$BITRATE_1080P"
 add_param "Bitrate720p" "$BITRATE_720P"
 add_param "Bitrate480p" "$BITRATE_480P"
+add_param "DenyTonemap" "$DENY_TONEMAP"
 
 # Run PowerShell script with built params
 eval "pwsh -File '/app/Optimize-Media.ps1' $PARAMS"
