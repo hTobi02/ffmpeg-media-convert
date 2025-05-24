@@ -291,7 +291,7 @@ function Convert-Video {
 
         # Optimierter Dateiname
         $outputName = $optimizedName -replace '\[(Bluray|WEBDL|WEB|Remux|HDTV|DVDRip|BRRip)-(\d+p)(\s+(Proper|Real))?\]', "[Optimized-$resolution]"
-        $outputName = $outputName -replace '\[x\d+\]|\[x265\]|\[x264\]|\[av1\]', "[$codecTag]"
+        $outputName = $outputName -replace '\[x\d+\]|\[x265\]|\[x264\]|\[av1\]|\[vc1\]', "[$codecTag]"
 
         $Output = New-Object PSObject -property @{
             id = $splitCount
