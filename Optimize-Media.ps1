@@ -259,10 +259,6 @@ function Convert-Video {
     $Outputs = @()
 
     foreach ($resolution in $BitrateMap.Keys) {
-        $bitrate = $BitrateMap[$resolution]
-        if (-not $bitrate) { continue }
-        if((Convert-BitrateToBps -Bitrate $bitrate) -ge $videoBitrate) { Write-Host "Final File might be bigger than original. Skipping..." -ForegroundColor Yellow; continue }
-
         $width = switch ($resolution) {
             "4320p" { 7680 }
             "3456p" { 6144 }
@@ -273,7 +269,6 @@ function Convert-Video {
             "720p"  { 1280 }
             "480p"  { 858 }
         }
-
         switch -Regex ($VideoCodec) {
             '264'          { $codecTag = 'x264' ; break }
             '265'          { $codecTag = 'x265' ; break }
@@ -281,6 +276,11 @@ function Convert-Video {
             'av1'          { $codecTag = 'av1'  ; break }
             default        { $codecTag = 'unknown' }
         }
+
+        $bitrate = $BitrateMap[$resolution]
+        if (-not $bitrate) { continue }
+        if(((Convert-BitrateToBps -Bitrate $bitrate) -ge $videoBitrate) -and ($width -le $videoWidth)) { Write-Host "Final File might be bigger than original. Skipping..." -ForegroundColor Yellow; continue }
+
 
         if($width -gt $videoWidth){
             Write-Host "Target ($width) bigger than the original resolution ($videoWidth). Skipping $resolution..." -ForegroundColor Yellow
