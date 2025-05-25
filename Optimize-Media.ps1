@@ -90,7 +90,8 @@ Param(
     $Bitrate1080p,
     $Bitrate720p,
     $Bitrate480p,
-    [boolean]$DenyTonemap
+    [boolean]$DenyTonemap,
+    [boolean]$AudioToStereo
 )
 
 function Test-IsHDR {
@@ -196,139 +197,240 @@ function Convert-AudioTag {
     }
 }
 
+function Get-AudioStereoMapping {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory)][string] $InputFile
+    )
+
+    Write-Verbose "==> Starting Get-AudioStereoMapping for file: $InputFile"
+
+    # ffprobe JSON auslesen, inkl. language-Tag
+    $json = & ffprobe -v error -select_streams a `
+        -show_entries stream=index,channels,channel_layout:stream_tags=language `
+        -of json "$InputFile" |
+        ConvertFrom-Json
+
+    Write-Verbose "Found $($json.streams.Count) audio stream(s)."
+
+    $filters   = @()
+    $maps      = @()
+    $metas     = @()
+    $seenLang  = @{}
+    $outCount  = 0
+
+    foreach ($stream in $json.streams) {
+        # ffprobe index ist 0-basiert
+        $idx = $stream.index
+        Write-Verbose "Stream raw index: $idx"
+
+        # Sprache ermitteln, fallback auf "und" (undetermined)
+        $lang = if ($stream.tags.language) { $stream.tags.language } else { "und" }
+        Write-Verbose "Processing stream idx=$($idx): channels=$($stream.channels), language=$lang"
+
+        # Wenn diese Sprache schon gemappt wurde, überspringen
+        if ($seenLang.ContainsKey($lang)) {
+            Write-Verbose "Skipping stream idx=$idx because language '$lang' is already mapped."
+            continue
+        }
+        $seenLang[$lang] = $true
+
+        $ch        = $stream.channels
+        $inLabel   = "[0:a:$idx]"
+        $outLabel  = "[aout$outCount]"
+
+        switch ($ch) {
+            1 {
+                $pan = "pan=stereo|c0=c0|c1=c0"
+                Write-Verbose "Built MONO->STEREO pan: $pan"
+            }
+            2 {
+                $pan = "anull"
+                Write-Verbose "Built STEREO passthrough pan: $pan"
+            }
+            6 {
+                Write-Verbose "Building 5.1(side)->STEREO pan"
+                $leftIdx   = @(0,4);    $rightIdx  = @(1,5);    $centerIdx = @(2)
+                $mixLeft   = ( ($leftIdx + $centerIdx) | ForEach-Object { "c$_" } ) -join "+"
+                $mixRight  = ( ($rightIdx + $centerIdx) | ForEach-Object { "c$_" } ) -join "+"
+                $pan       = "pan=stereo|c0=$mixLeft|c1=$mixRight"
+                Write-Verbose "Built pan: $pan"
+            }
+            8 {
+                Write-Verbose "Building 7.1->STEREO pan"
+                $leftIdx   = @(0,4,6);  $rightIdx  = @(1,5,7);  $centerIdx = @(2)
+                $mixLeft   = ( ($leftIdx + $centerIdx) | ForEach-Object { "c$_" } ) -join "+"
+                $mixRight  = ( ($rightIdx + $centerIdx) | ForEach-Object { "c$_" } ) -join "+"
+                $pan       = "pan=stereo|c0=$mixLeft|c1=$mixRight"
+                Write-Verbose "Built pan: $pan"
+            }
+            default {
+                Write-Verbose "Building fallback pan for $ch channels"
+                $all  = 0..($ch - 1) | ForEach-Object { "c$_" } -join "+"
+                $pan  = "pan=stereo|c0=$all|c1=$all"
+                Write-Verbose "Built fallback pan: $pan"
+            }
+        }
+
+        # Filter, Map und Metadata sammeln
+        $filters += "$inLabel $pan $outLabel"
+        $maps    += "-map $outLabel"
+        $metas   += "-metadata:s:a:$outCount language=$lang"
+
+        $outCount++
+    }
+
+    Write-Verbose "Generated $($filters.Count) filter(s), $($maps.Count) map(s) and $($metas.Count) meta(s)."
+    return @{ Filters = $filters; Maps = $maps; Metas = $metas }
+}
+
 
 function Convert-Video {
+    [CmdletBinding()]
     param (
-        [object]$InputFile,
-        [string]$OutputDirectory,
-        [string]$VideoCodec,
-        [string]$AudioCodec,
-        [hashtable]$BitrateMap,
-        [boolean]$DenyTonemap
+        [Parameter(Mandatory)][object]   $InputFile,
+        [Parameter(Mandatory)][string]   $OutputDirectory,
+        [Parameter(Mandatory)][string]   $VideoCodec,
+        [Parameter(Mandatory)][string]   $AudioCodec,
+        [Parameter(Mandatory)][hashtable] $BitrateMap,
+        [boolean]                        $DenyTonemap,
+        [boolean]                        $AudioToStereo
     )
-    
-    $basename = $InputFile.BaseName
-    $fullname = $InputFile.FullName
 
-    if (-not $VideoCodec) {
-        Write-Host "Missing video codec. Abort." -ForegroundColor Red
-        return
-    }
-    if (-not $AudioCodec) {
-        Write-Host "Missing audio codec. Abort." -ForegroundColor Red
-        return
-    }
+    Write-Verbose "==> Starting Convert-Video for '$($InputFile.Name)'"
 
-    if(!($DenyTonemap)){
-        $isHDR = Test-IsHDR -VideoFile $fullname
-        $isDoVi = Test-DoVi -VideoFile $fullname
+    # Validierung
+    if (-not $VideoCodec) { Write-Host "Missing video codec. Abort." -ForegroundColor Red; return }
+    if (-not $AudioCodec) { Write-Host "Missing audio codec. Abort." -ForegroundColor Red; return }
 
+    # HDR / Tonemap
+    if (-not $DenyTonemap) {
+        $isHDR  = Test-IsHDR -VideoFile $InputFile.FullName
+        $isDoVi = Test-DoVi -VideoFile $InputFile.FullName
         if ($isDoVi.dv_profile -eq 5) {
             Write-Host "Unsupported DoVi profile: $($isDoVi.dv_profile)" -ForegroundColor Red
-            $optimizedName = $basename
             return
         } elseif ($isHDR) {
-            $tonemapFilter = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,"
-            $HDRTagsRegex = '\[(DV\s+)?(HDR|HDR10|HDR10Plus?(\+|Plus)?|DV|HDR|HDR10|HDR10Plus)\]'
-            $optimizedName = $basename -replace $HDRTagsRegex, ''
+            $tonemapFilter = "zscale=t=linear:npl=100,format=gbrpf32le," +
+                             "zscale=p=bt709,tonemap=tonemap=hable:desat=0," +
+                             "zscale=t=bt709:m=bt709:r=tv,format=yuv420p,"
+            $HDRTagsRegex  = '\[(DV\s+)?(HDR|HDR10|HDR10Plus?(\+|Plus)?|DV|HDR10Plus)\]'
+            $optimizedName = $InputFile.BaseName -replace $HDRTagsRegex, ''
         } else {
             $tonemapFilter = ""
-            $optimizedName = $basename
+            $optimizedName = $InputFile.BaseName
+        }
+    } else {
+        $tonemapFilter = ""
+        $optimizedName = $InputFile.BaseName
+    }
+
+    # Video-Auflösung ermitteln
+    $videoStream = & ffprobe -v error -select_streams v:0 `
+        -show_entries stream=width,height -of csv=p=0 "$($InputFile.FullName)"
+    $parts       = $videoStream -split ","
+    $videoWidth  = [int]$parts[0]
+
+    # Dauer & Dateigröße
+    $durSize      = & ffprobe -v error `
+        -show_entries format=duration,size -of csv=p=0 "$($InputFile.FullName)"
+    $dsParts      = $durSize -split ","
+    $duration     = [double]$dsParts[0]
+    $filesize     = [double]$dsParts[1]
+    $videoBitrate = $filesize / ($duration/60*0.0075) / 1000
+
+    # Name anpassen
+    if ($AudioCodec -ne "copy") {
+        $AudioInfo     = Get-AudioInfo -File $InputFile.FullName
+        $AudioReplace  = if ($AudioInfo.profile -eq "unknown") { $AudioInfo.codec.ToUpper() } else { $AudioInfo.profile }
+        $tag           = Convert-AudioTag -Codec $AudioCodec
+        $optimizedName = $optimizedName -replace $AudioReplace, $tag
+        if($AudioToStereo){
+            $optimizedName = $optimizedName -replace '\[([^\]]+?)\s+[0-9]+\.[0-9]+\]', '[$1 2.0]'
         }
     }
-    
-    # Auflösung des Quellvideos ermitteln
-    $videoStream = Invoke-Expression "ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 `"$fullname`""
-    $videoWidth, $videoHeight = $videoStream -split ","
 
-    $videoWidth = [int]$videoWidth
-    $videoHeight = [int]$videoHeight[0]
-
-    $duration, $filesize = (& ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$fullname") -split ","
-    $videoBitrate = $filesize/($duration/60*0.0075)/1000
-
-    if($AudioCodec -ne "copy"){
-        # AudioInfos ermitteln
-        $AudioInfo = Get-AudioInfo -File $fullname
-        if(($AudioInfo.profile) -eq "unknown"){$AudioReplace = $AudioInfo.codec.toUpper()} else {$AudioReplace = $AudioInfo.profile}
-        $optimizedName = $optimizedName -replace "$($AudioReplace)","$(Convert-AudioTag -Codec $AudioCodec)"
-    }
-
-    # Filter & Mapping vorbereiten
+    # Video-Splits definieren
     $splitCount = 0
-    $Outputs = @()
-
+    $Outputs    = @()
     foreach ($resolution in $BitrateMap.Keys) {
-        $width = switch ($resolution) {
-            "4320p" { 7680 }
-            "3456p" { 6144 }
-            "2880p" { 5120 }
-            "2160p" { 3840 }
-            "1440p" { 2560 }
-            "1080p" { 1920 }
-            "720p"  { 1280 }
-            "480p"  { 858 }
+        $width    = switch ($resolution) {
+            "4320p" { 7680 }; "3456p" { 6144 }; "2880p" { 5120 }
+            "2160p" { 3840 }; "1440p" { 2560 }; "1080p" { 1920 }
+            "720p"  { 1280 }; "480p"  { 858 }
         }
-        switch -Regex ($VideoCodec) {
-            '264'          { $codecTag = 'x264' ; break }
-            '265'          { $codecTag = 'x265' ; break }
-            'hevc'         { $codecTag = 'x265' ; break }
-            'av1'          { $codecTag = 'av1'  ; break }
-            default        { $codecTag = 'unknown' }
+        $codecTag = switch -Regex ($VideoCodec) {
+            '264'  { 'x264' }; '265'  { 'x265' }
+            'hevc' { 'x265' }; 'av1'  { 'av1' }
+            default{ 'unknown' }
         }
-
         $bitrate = $BitrateMap[$resolution]
         if (-not $bitrate) { continue }
-        if(((Convert-BitrateToBps -Bitrate $bitrate) -ge $videoBitrate) -and ($width -le $videoWidth)) { Write-Host "Final File might be bigger than original. Skipping..." -ForegroundColor Yellow; continue }
-
-
-        if($width -gt $videoWidth){
-            Write-Host "Target ($width) bigger than the original resolution ($videoWidth). Skipping $resolution..." -ForegroundColor Yellow
+        if ((Convert-BitrateToBps -Bitrate $bitrate) -ge $videoBitrate -and $width -le $videoWidth) {
+            continue
+        }
+        if ($width -gt $videoWidth) {
             continue
         }
 
         $splitCount++
+        $outName = $optimizedName `
+            -replace '\[(Bluray|WEBDL|WEB|Remux|HDTV|DVDRip|BRRip)-\d+p.*?\]', "[Optimized-$resolution]" `
+            -replace '\[x\d+\]|\[x264\]|\[x265\]|\[hevc\]|\[av1\]|\[vc1\]', "[$codecTag]"
 
-        # Optimierter Dateiname
-        $outputName = $optimizedName -replace '\[(Bluray|WEBDL|WEB|Remux|HDTV|DVDRip|BRRip)-(\d+p)(\s+(Proper|Real))?\]', "[Optimized-$resolution]"
-        $outputName = $outputName -replace '\[x\d+\]|\[x265\]|\[x264\]|\[av1\]|\[vc1\]', "[$codecTag]"
-
-        $Output = New-Object PSObject -property @{
-            id = $splitCount
+        $Outputs += [PSCustomObject]@{
+            id           = $splitCount
             filterOutput = "v$splitCount"
-            mapCommand = "-map [v$($splitCount)out] -c:v $VideoCodec -b:v $bitrate"
-            videoFilter = "[v$splitCount]scale=$($width):-2[v$($splitCount)out]"
-            outputFile = "$OutputDirectory/$($outputName).mkv"
-            
+            mapCommand   = "-map [v${splitCount}out] -c:v $VideoCodec -b:v $bitrate"
+            videoFilter  = "[v$splitCount]scale=$($width):-2[v${splitCount}out]"
+            outputFile   = Join-Path $OutputDirectory "$outName.mkv"
         }
-        $Outputs += $Output
     }
 
     if ($splitCount -eq 0) {
-        Write-Host "No valid bit rates specified. Skipping $fullname." -ForegroundColor DarkGray
+        Write-Host "No valid bit rates specified. Skipping conversion." -ForegroundColor DarkGray
         return
     }
 
-    $filterComplex = "[0:v]${tonemapFilter}split=$splitCount$($Outputs.filterOutput | ForEach-Object { "[$_]" })$($Outputs.videoFilter | ForEach-Object { ";$_" })" -replace " ",""
-    
-    $mapAudio = "-map a -c:a $AudioCodec"
-    $mapSubtitles = "-map s? -c:s copy"
-    $mapMetadata = "-map_metadata 0 -map_chapters 0"
+    # Video-Filter-Complex
+    $videoFC = "[0:v]${tonemapFilter}split=$splitCount" +
+               ($Outputs | ForEach-Object { "[v$($_.id)]" }) + ";" +
+               ($Outputs | ForEach-Object { $_.videoFilter }) -replace " ", ""
 
-    $debug=""
-    #$debug=" -ss 00:10:00 -to 00:10:30"
-
-    $cmd = "ffmpeg -hide_banner -loglevel error -n -stats$debug -i `"$fullname`" -filter_complex `"$filterComplex`" "
-    foreach($Output in $Outputs){
-        $cmd += "$($Output.MapCommand) $mapAudio $mapSubtitles $mapMetadata `"$($Output.outputFile)`" "
+    # Audio-Mapping (inkl. Metadaten)
+    if ($AudioToStereo) {
+        $audioData         = Get-AudioStereoMapping -InputFile $InputFile.FullName -Verbose:$PSBoundParameters.Verbose
+        $allFilters        = @($videoFC) + $audioData.Filters
+        $filterComplexAll  = $allFilters -join ";"
+        $audioMaps         = $audioData.Maps  -join " "
+        $audioMetas        = $audioData.Metas -join " "
+    } else {
+        $filterComplexAll = $videoFC
+        $audioMaps        = "-map a"
+        $audioMetas       = ""
     }
 
+    $mapSubs = "-map s? -c:s copy"
+    $mapMeta = "-map_metadata 0 -map_chapters 0"
 
+    # ffmpeg-Kommando zusammenbauen
+    $cmd = "ffmpeg -hide_banner -loglevel error -n -stats -i `"$($InputFile.FullName)`" " +
+           "-filter_complex `"$filterComplexAll`" "
+
+    foreach ($out in $Outputs) {
+        $cmd += "$($out.mapCommand) " +
+                "$audioMaps $audioMetas -c:a $AudioCodec " +
+                "$mapSubs $mapMeta `"$($out.outputFile)`" "
+    }
+
+    Write-Verbose "Final ffmpeg command: $cmd"
     Write-Host "Convert: $basename with $splitCount version(s)..." -ForegroundColor Cyan
-    Write-Host $cmd -ForegroundColor DarkGray
 
     Invoke-Expression $cmd
 }
+
+
+
 
 
 $bitrateMap = @{
@@ -340,6 +442,11 @@ $bitrateMap = @{
     "1080p" = $Bitrate1080p
     "720p"  = $Bitrate720p
     "480p"  = $Bitrate480p
+}
+
+if($AudioToStereo -and ($AudioCodec -eq "copy")){
+    Write-Error "Can't convert audio to stereo while AudioCodec equals `"copy`""
+    exit
 }
 
 $Files = Get-ChildItem -Path "$OriginalPath/*" -Recurse -Include *.mkv, *.mp4, *.avi, *.m4v | Sort-Object -Property Name
@@ -354,5 +461,7 @@ foreach ($File in $Files) {
         -OutputDirectory $OutputPath `
         -VideoCodec $VideoCodec `
         -AudioCodec $AudioCodec `
-        -BitrateMap $bitrateMap
+        -BitrateMap $bitrateMap `
+        -DenyTonemap $DenyTonemap `
+        -AudioToStereo $AudioToStereo
 }
