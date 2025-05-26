@@ -299,14 +299,14 @@ function Convert-Video {
 
     Write-Verbose "==> Starting Convert-Video for '$($InputFile.Name)'"
 
-    # Validierung
+    # --- Validierung ---
     if (-not $VideoCodec) { Write-Host "Missing video codec. Abort." -ForegroundColor Red; return }
     if (-not $AudioCodec) { Write-Host "Missing audio codec. Abort." -ForegroundColor Red; return }
 
-    # HDR / Tonemap
+    # --- HDR / Tonemap ---
     if (-not $DenyTonemap) {
         $isHDR  = Test-IsHDR -VideoFile $InputFile.FullName
-        $isDoVi = Test-DoVi -VideoFile $InputFile.FullName
+        $isDoVi = Test-DoVi  -VideoFile $InputFile.FullName
         if ($isDoVi.dv_profile -eq 5) {
             Write-Host "Unsupported DoVi profile: $($isDoVi.dv_profile)" -ForegroundColor Red
             return
@@ -325,13 +325,13 @@ function Convert-Video {
         $optimizedName = $InputFile.BaseName
     }
 
-    # Video-Auflösung ermitteln
+    # --- Video-Auflösung ermitteln ---
     $videoStream = & ffprobe -v error -select_streams v:0 `
         -show_entries stream=width,height -of csv=p=0 "$($InputFile.FullName)"
     $parts       = $videoStream -split ","
     $videoWidth  = [int]$parts[0]
 
-    # Dauer & Dateigröße
+    # --- Dauer & Dateigröße ---
     $durSize      = & ffprobe -v error `
         -show_entries format=duration,size -of csv=p=0 "$($InputFile.FullName)"
     $dsParts      = $durSize -split ","
@@ -339,18 +339,18 @@ function Convert-Video {
     $filesize     = [double]$dsParts[1]
     $videoBitrate = $filesize / ($duration/60*0.0075) / 1000
 
-    # Name anpassen
+    # --- Name anpassen bei neuem Audio-Codec ---
     if ($AudioCodec -ne "copy") {
         $AudioInfo     = Get-AudioInfo -File $InputFile.FullName
         $AudioReplace  = if ($AudioInfo.profile -eq "unknown") { $AudioInfo.codec.ToUpper() } else { $AudioInfo.profile }
         $tag           = Convert-AudioTag -Codec $AudioCodec
         $optimizedName = $optimizedName -replace $AudioReplace, $tag
-        if($AudioToStereo){
+        if ($AudioToStereo) {
             $optimizedName = $optimizedName -replace '\[([^\]]+?)\s+[0-9]+\.[0-9]+\]', '[$1 2.0]'
         }
     }
 
-    # Video-Splits definieren
+    # --- Video-Outputs konfigurieren ---
     $splitCount = 0
     $Outputs    = @()
     foreach ($resolution in $BitrateMap.Keys) {
