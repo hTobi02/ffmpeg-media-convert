@@ -359,82 +359,89 @@ function Convert-Video {
             "2160p" { 3840 }; "1440p" { 2560 }; "1080p" { 1920 }
             "720p"  { 1280 }; "480p"  { 858 }
         }
-        $codecTag = switch -Regex ($VideoCodec) {
-            '264'  { 'x264' }; '265'  { 'x265' }
-            'hevc' { 'x265' }; 'av1'  { 'av1' }
-            default{ 'unknown' }
-        }
         $bitrate = $BitrateMap[$resolution]
-        if (-not $bitrate) { continue }
-        if ((Convert-BitrateToBps -Bitrate $bitrate) -ge $videoBitrate -and $width -le $videoWidth) {
-            Write-Verbose "$(Convert-BitrateToBps -Bitrate $bitrate) -ge $videoBitrate -and $width -le $videoWidth"
-            continue
-        }
-        if ($width -gt $videoWidth) {
-            Write-Verbose "$width -gt $videoWidth"
-            continue
-        }
+        if (-not $bitrate -or $width -gt $videoWidth) { continue }
+        Write-Verbose "readying up resolution $resolution"
 
-        $splitCount++
+
         $outName = $optimizedName `
             -replace '\[(Bluray|WEBDL|WEB|Remux|HDTV|DVDRip|BRRip)-\d+p.*?\]', "[Optimized-$resolution]" `
-            -replace '\[x\d+\]|\[x264\]|\[x265\]|\[hevc\]|\[av1\]|\[vc1\]', "[$codecTag]"
-
+            -replace '\[x\d+\]|\[x264\]|\[x265\]|\[hevc\]|\[av1\]|\[vc1\]\[vp9\]', "[$($VideoCodec -replace 'lib','')]"
+        $outputFile   = Join-Path $OutputDirectory "$outName.mkv"
+        if(Test-Path -LiteralPath $outputFile){ Write-Verbose "Resolution $resolution already exists: $outputFile";continue }
+        
+        $splitCount++
         $Outputs += [PSCustomObject]@{
-            id           = $splitCount
-            filterOutput = "v$splitCount"
-            mapCommand   = "-map [v${splitCount}out] -c:v $VideoCodec -b:v $bitrate"
-            videoFilter  = "[v$splitCount]scale=$($width):-2[v${splitCount}out]"
-            outputFile   = Join-Path $OutputDirectory "$outName.mkv"
+            id         = $splitCount
+            width      = $width
+            bitrate    = $bitrate
+            outputFile = $outputFile
         }
     }
 
     if ($splitCount -eq 0) {
         Write-Host "No valid bit rates specified. Skipping conversion." -ForegroundColor DarkGray
-        Write-Verbose "splitCount: $splitCount"
         return
     }
 
-    # Video-Filter-Complex
-    $videoFC = "[0:v]${tonemapFilter}split=$splitCount" +
-               ($Outputs | ForEach-Object { "[v$($_.id)]" }) + ";" +
-               ($Outputs | ForEach-Object { $_.videoFilter }) -replace " ", ""
+    # === Neuer Audio-Teil mit Duplizierung per asplit ===
+    $audioFilters = @()
+    $audioLabels  = @{}
+    $langIndex    = 0
 
-    # Audio-Mapping (inkl. Metadaten)
-    if ($AudioToStereo) {
-        $audioData         = Get-AudioStereoMapping -InputFile $InputFile.FullName -Verbose:$PSBoundParameters.Verbose
-        $allFilters        = @($videoFC) + $audioData.Filters
-        $filterComplexAll  = $allFilters -join ";"
-        $audioMaps         = $audioData.Maps  -join " "
-        $audioMetas        = $audioData.Metas -join " "
-    } else {
-        $filterComplexAll = $videoFC
-        $audioMaps        = "-map a"
-        $audioMetas       = ""
+    $streams = (& ffprobe -v error `
+        -select_streams a `
+        -show_entries stream=index,channels,channel_layout:stream_tags=language `
+        -of json $InputFile.FullName | ConvertFrom-Json).streams
+
+    foreach ($stream in $streams) {
+        $lang = if ($stream.tags.language) { $stream.tags.language } else { 'und' }
+        if ($audioLabels.ContainsKey($lang)) { continue }
+
+        $idx = $stream.index - 1
+        $pan = switch ($stream.channels) {
+            1 { 'pan=stereo|c0=c0|c1=c0' }
+            2 { 'anull' }
+            6 { 'pan=stereo|c0=c0+c4+c2|c1=c1+c5+c2' }
+            8 { 'pan=stereo|c0=c0+c4+c6+c2|c1=c1+c5+c7+c2' }
+            default { "pan=stereo|c0=0|c1=0" }
+        }
+
+        $base = "a$langIndex"
+        $audioLabels[$lang] = $base
+        $audioFilters += "[0:a:$idx]$pan[$base]"
+        $audioFilters += "[$base]asplit=$splitCount" + ((0..($splitCount-1)) | ForEach-Object { "[$base$_]" }) -join ''
+        $langIndex++
     }
 
-    $mapSubs = "-map s? -c:s copy"
-    $mapMeta = "-map_metadata 0 -map_chapters 0"
+    # === Filter-Complex zusammenbauen ===
+    $videoLabels = (1..$splitCount | ForEach-Object { "[v$_]" }) -join ''
+    $videoSplit  = "[0:v]$tonemapFilter split=$splitCount$videoLabels"
+    $videoScales = ($Outputs | ForEach-Object { "[v$($_.id)]scale=$($_.width):-2[v$($_.id)out]" }) -join ';'
 
-    # ffmpeg-Kommando zusammenbauen
-    $cmd = "ffmpeg -hide_banner -loglevel error -n -stats -i `"$($InputFile.FullName)`" " +
-           "-filter_complex `"$filterComplexAll`" "
+    $filterComplex = "$videoSplit;$videoScales;" + ($audioFilters -join ';')
 
-    foreach ($out in $Outputs) {
-        $cmd += "$($out.mapCommand) " +
-                "$audioMaps $audioMetas -c:a $AudioCodec " +
-                "$mapSubs $mapMeta `"$($out.outputFile)`" "
+    # === ffmpeg-Kommando bauen ===
+    $cmd = "ffmpeg -hide_banner -loglevel error -n -stats -i `"$($InputFile.FullName)`" -filter_complex `"$filterComplex`" "
+
+    for ($i = 1; $i -le $splitCount; $i++) {
+        $out = $Outputs | Where-Object { $_.id -eq $i }
+        $cmd += "-map [v${i}out] -c:v $VideoCodec -b:v $($out.bitrate) "
+
+        $si = 0
+        foreach ($lang in $audioLabels.Keys) {
+            $baseLabel = $audioLabels[$lang]
+            $dupLabel  = "[$baseLabel$(( $i - 1 ))]"
+            $cmd += "-map $dupLabel -metadata:s:a:$si language=$lang "
+            $si++
+        }
+
+        $cmd += "-c:a $AudioCodec -map s? -c:s copy -map_metadata 0 -map_chapters 0 `"$($out.outputFile)`" "
     }
 
     Write-Verbose "Final ffmpeg command: $cmd"
-    Write-Host "Convert: $basename with $splitCount version(s)..." -ForegroundColor Cyan
-
     Invoke-Expression $cmd
 }
-
-
-
-
 
 $bitrateMap = @{
     "4320p" = $Bitrate4320p
