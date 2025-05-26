@@ -367,9 +367,11 @@ function Convert-Video {
         $bitrate = $BitrateMap[$resolution]
         if (-not $bitrate) { continue }
         if ((Convert-BitrateToBps -Bitrate $bitrate) -ge $videoBitrate -and $width -le $videoWidth) {
+            Write-Verbose "$(Convert-BitrateToBps -Bitrate $bitrate) -ge $videoBitrate -and $width -le $videoWidth"
             continue
         }
         if ($width -gt $videoWidth) {
+            Write-Verbose "$width -gt $videoWidth"
             continue
         }
 
@@ -389,6 +391,7 @@ function Convert-Video {
 
     if ($splitCount -eq 0) {
         Write-Host "No valid bit rates specified. Skipping conversion." -ForegroundColor DarkGray
+        Write-Verbose "splitCount: $splitCount"
         return
     }
 
