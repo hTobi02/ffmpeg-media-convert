@@ -146,6 +146,37 @@ function Test-DoVi {
     }
 }
 
+function Get-AutoCrop {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$VideoFile,
+        [int]$DetectDuration = 60
+    )
+    # Test-Path mit -LiteralPath, damit [ ] nicht als Wildcards interpretiert werden
+    if (-Not (Test-Path -LiteralPath $VideoFile)) {
+        Write-Host "Video File not found for crop detection: $VideoFile" -ForegroundColor Yellow
+        return ""
+    }
+
+    # Ermittel Crop-Parameter der ersten $DetectDuration Sekunden
+    $args = @(
+        "-hide_banner", "-ss", "00:01:00", "-t", $DetectDuration,
+        "-i", $VideoFile, "-vf", "cropdetect",
+        "-f", "null", "-"
+    )
+    $output = & ffmpeg @args 2>&1
+
+    Write-Verbose "Crop Output: $($output | Select-String -Pattern "crop=\d+:\d+:\d+:\d+")"
+
+    # letzte crop= Zeile parsen
+    $cropLine = ($output |
+        Select-String -Pattern "crop=\d+:\d+:\d+:\d+" |
+        ForEach-Object { $_.Matches.Value })[-1]
+
+    return $cropLine
+}
+
+
 function Convert-BitrateToBps {
     param (
         [Parameter(Mandatory)]
@@ -296,7 +327,6 @@ function Convert-Video {
         [boolean]                        $DenyTonemap,
         [boolean]                        $AudioToStereo
     )
-
     Write-Verbose "==> Starting Convert-Video for '$($InputFile.Name)'"
 
     # --- Validierung ---
@@ -308,32 +338,31 @@ function Convert-Video {
         $isHDR  = Test-IsHDR -VideoFile $InputFile.FullName
         $isDoVi = Test-DoVi  -VideoFile $InputFile.FullName
         if ($isDoVi.dv_profile -eq 5) {
-            Write-Host "Unsupported DoVi profile: $($isDoVi.dv_profile)" -ForegroundColor Red
-            return
+            Write-Host "Unsupported DoVi profile: $($isDoVi.dv_profile)" -ForegroundColor Red; return
         } elseif ($isHDR) {
             $tonemapFilter = "zscale=t=linear:npl=100,format=gbrpf32le," +
                              "zscale=p=bt709,tonemap=tonemap=hable:desat=0," +
                              "zscale=t=bt709:m=bt709:r=tv,format=yuv420p,"
-            $HDRTagsRegex  = '\[(DV\s+)?(HDR|HDR10|HDR10Plus?(\+|Plus)?|DV|HDR10Plus)\]'
-            $optimizedName = $InputFile.BaseName -replace $HDRTagsRegex, ''
+            $optimizedName  = $InputFile.BaseName -replace '\[(DV\s+)?(HDR|HDR10|HDR10Plus?(\+|Plus)?|DV|HDR10Plus)\]', ''
         } else {
-            $tonemapFilter = ""
-            $optimizedName = $InputFile.BaseName
+            $tonemapFilter = ""; $optimizedName = $InputFile.BaseName
         }
     } else {
-        $tonemapFilter = ""
-        $optimizedName = $InputFile.BaseName
+        $tonemapFilter = ""; $optimizedName = $InputFile.BaseName
     }
 
+    # --- AutoCrop ---
+    $cropParams = Get-AutoCrop -VideoFile "$($InputFile.FullName)" -DetectDuration 5
+    Write-Verbose "Crop Params: $cropParams"
+    if ($cropParams) { $cropFilter = "$cropParams," } else { $cropFilter = "" }
+
     # --- Video-Auflösung ermitteln ---
-    $videoStream = & ffprobe -v error -select_streams v:0 `
-        -show_entries stream=width,height -of csv=p=0 "$($InputFile.FullName)"
+    $videoStream = & ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$($InputFile.FullName)"
     $parts       = $videoStream -split ","
     $videoWidth  = [int]$parts[0]
 
     # --- Dauer & Dateigröße ---
-    $durSize      = & ffprobe -v error `
-        -show_entries format=duration,size -of csv=p=0 "$($InputFile.FullName)"
+    $durSize      = & ffprobe -v error -show_entries format=duration,size -of csv=p=0 "$($InputFile.FullName)"
     $dsParts      = $durSize -split ","
     $duration     = [double]$dsParts[0]
     $filesize     = [double]$dsParts[1]
@@ -351,62 +380,47 @@ function Convert-Video {
     }
 
     # --- Video-Outputs konfigurieren ---
-    $splitCount = 0
-    $Outputs    = @()
+    $splitCount = 0; $Outputs = @()
     foreach ($resolution in $BitrateMap.Keys) {
         $width    = switch ($resolution) {
-            "4320p" { 7680 }; "3456p" { 6144 }; "2880p" { 5120 }
-            "2160p" { 3840 }; "1440p" { 2560 }; "1080p" { 1920 }
+            "4320p" { 7680 }; "3456p" { 6144 }; "2880p" { 5120 };
+            "2160p" { 3840 }; "1440p" { 2560 }; "1080p" { 1920 };
             "720p"  { 1280 }; "480p"  { 858 }
         }
         $bitrate = $BitrateMap[$resolution]
         if (-not $bitrate -or $width -gt $videoWidth) { continue }
         Write-Verbose "readying up resolution $resolution"
 
-
-        $outName = $optimizedName `
+        $outName     = $optimizedName `
             -replace '\[(Bluray|WEBDL|WEB|Remux|HDTV|DVDRip|BRRip)-\d+p.*?\]', "[Optimized-$resolution]" `
             -replace '\[x\d+\]|\[x264\]|\[x265\]|\[hevc\]|\[av1\]|\[vc1\]\[vp9\]', "[$($VideoCodec -replace 'lib','')]"
-        $outputFile   = Join-Path $OutputDirectory "$outName.mkv"
-        if(Test-Path -LiteralPath $outputFile){ Write-Verbose "Resolution $resolution already exists: $outputFile";continue }
-        
-        $splitCount++
-        $Outputs += [PSCustomObject]@{
-            id         = $splitCount
-            width      = $width
-            bitrate    = $bitrate
-            outputFile = $outputFile
+        $outputFile  = Join-Path $OutputDirectory "$outName.mkv"
+        if (Test-Path -LiteralPath $outputFile) {
+            Write-Verbose "Resolution $resolution already exists: $outputFile"; continue
         }
+        $splitCount++
+        $Outputs += [PSCustomObject]@{ id = $splitCount; width = $width; bitrate = $bitrate; outputFile = $outputFile }
     }
-
     if ($splitCount -eq 0) {
         Write-Host "No valid bit rates specified. Skipping conversion." -ForegroundColor DarkGray
         return
     }
 
-    # === Neuer Audio-Teil mit Duplizierung per asplit ===
-    $audioFilters = @()
-    $audioLabels  = @{}
-    $langIndex    = 0
-
-    $streams = (& ffprobe -v error `
-        -select_streams a `
-        -show_entries stream=index,channels,channel_layout:stream_tags=language `
-        -of json $InputFile.FullName | ConvertFrom-Json).streams
-
+    # --- Audio Duplizieren & Mapping ---
+    $audioFilters = @(); $audioLabels = @{}; $langIndex = 0
+    $streams = (& ffprobe -v error -select_streams a -show_entries stream=index,channels,stream_tags=language -of json $InputFile.FullName |
+                ConvertFrom-Json).streams
     foreach ($stream in $streams) {
         $lang = if ($stream.tags.language) { $stream.tags.language } else { 'und' }
         if ($audioLabels.ContainsKey($lang)) { continue }
-
-        $idx = $stream.index - 1
-        $pan = switch ($stream.channels) {
+        $idx  = $stream.index - 1
+        $pan  = switch ($stream.channels) {
             1 { 'pan=stereo|c0=c0|c1=c0' }
             2 { 'anull' }
             6 { 'pan=stereo|c0=c0+c4+c2|c1=c1+c5+c2' }
             8 { 'pan=stereo|c0=c0+c4+c6+c2|c1=c1+c5+c7+c2' }
             default { "pan=stereo|c0=0|c1=0" }
         }
-
         $base = "a$langIndex"
         $audioLabels[$lang] = $base
         $audioFilters += "[0:a:$idx]$pan[$base]"
@@ -414,31 +428,25 @@ function Convert-Video {
         $langIndex++
     }
 
-    # === Filter-Complex zusammenbauen ===
+    # --- Filter-Complex bauen (mit AutoCrop + Tonemap + Split + Scale + Audio) ---
     $videoLabels = (1..$splitCount | ForEach-Object { "[v$_]" }) -join ''
-    $videoSplit  = "[0:v]$tonemapFilter split=$splitCount$videoLabels"
+    $videoSplit  = "[0:v]$cropFilter$tonemapFilter split=$splitCount$videoLabels"
     $videoScales = ($Outputs | ForEach-Object { "[v$($_.id)]scale=$($_.width):-2[v$($_.id)out]" }) -join ';'
-
     $filterComplex = "$videoSplit;$videoScales;" + ($audioFilters -join ';')
 
-    # === ffmpeg-Kommando bauen ===
+    # --- ffmpeg-Kommando ausführen ---
     $cmd = "ffmpeg -hide_banner -loglevel error -n -stats -i `"$($InputFile.FullName)`" -filter_complex `"$filterComplex`" "
-
     for ($i = 1; $i -le $splitCount; $i++) {
         $out = $Outputs | Where-Object { $_.id -eq $i }
         $cmd += "-map [v${i}out] -c:v $VideoCodec -b:v $($out.bitrate) "
-
         $si = 0
         foreach ($lang in $audioLabels.Keys) {
-            $baseLabel = $audioLabels[$lang]
-            $dupLabel  = "[$baseLabel$(( $i - 1 ))]"
+            $dupLabel = "[$($audioLabels[$lang])$(( $i - 1 ))]"
             $cmd += "-map $dupLabel -metadata:s:a:$si language=$lang "
             $si++
         }
-
         $cmd += "-c:a $AudioCodec -map s? -c:s copy -map_metadata 0 -map_chapters 0 `"$($out.outputFile)`" "
     }
-
     Write-Verbose "Final ffmpeg command: $cmd"
     Invoke-Expression $cmd
 }
