@@ -408,8 +408,9 @@ function Convert-Video {
 
     # --- Audio Duplizieren & Mapping ---
     $audioFilters = @(); $audioLabels = @{}; $langIndex = 0
-    $streams = (& ffprobe -v error -select_streams a -show_entries stream=index,channels,stream_tags=language -of json $InputFile.FullName |
+    $streams = (& ffprobe -v error -select_streams a -show_entries stream=index,channels,channel_layout:stream_tags=language -of json "$($InputFile.FullName)" |
                 ConvertFrom-Json).streams
+    Write-Verbose "Found Audio Infos: $streams"
     foreach ($stream in $streams) {
         $lang = if ($stream.tags.language) { $stream.tags.language } else { 'und' }
         if ($audioLabels.ContainsKey($lang)) { continue }
