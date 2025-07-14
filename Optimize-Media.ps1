@@ -373,7 +373,7 @@ function Convert-Video {
     # --- Name anpassen bei neuem Audio-Codec ---
     if ($AudioCodec -ne "copy") {
         $AudioInfo     = Get-AudioInfo -File $InputFile.FullName
-        $AudioReplace  = if ($AudioInfo.profile -eq "unknown") { $AudioInfo.codec.ToUpper() } else { $AudioInfo.profile }
+        $AudioReplace  = if ($AudioInfo.profile -eq "unknown") { $AudioInfo.codec.ToUpper() } elseif ($AudioInfo.profile -eq "Dolby TrueHD + Dolby Atmos") { "TrueHD Atmos" } else { $AudioInfo.profile }
         $tag           = Convert-AudioTag -Codec $AudioCodec
         $optimizedName = $optimizedName -replace $AudioReplace, $tag
         if ($AudioToStereo) {
