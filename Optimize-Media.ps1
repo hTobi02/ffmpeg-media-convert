@@ -91,7 +91,8 @@ Param(
     $Bitrate720p,
     $Bitrate480p,
     [boolean]$DenyTonemap,
-    [boolean]$AudioToStereo
+    [boolean]$AudioToStereo,
+    [string]$uploader=$null
 )
 
 function Test-IsHDR {
@@ -166,7 +167,7 @@ function Get-AutoCrop {
     )
     $output = & ffmpeg @args 2>&1
 
-    Write-Verbose "Crop Output: $($output | Select-String -Pattern "crop=\d+:\d+:\d+:\d+")"
+    #Write-Verbose "Crop Output: $($output | Select-String -Pattern "crop=\d+:\d+:\d+:\d+")"
 
     # letzte crop= Zeile parsen
     $cropLine = ($output |
@@ -325,7 +326,8 @@ function Convert-Video {
         [Parameter(Mandatory)][string]   $AudioCodec,
         [Parameter(Mandatory)][hashtable] $BitrateMap,
         [boolean]                        $DenyTonemap,
-        [boolean]                        $AudioToStereo
+        [boolean]                        $AudioToStereo,
+        [string]$uploader
     )
     Write-Verbose "==> Starting Convert-Video for '$($InputFile.Name)'"
 
@@ -394,6 +396,7 @@ function Convert-Video {
         $outName     = $optimizedName `
             -replace '\[(Bluray|WEBDL|WEB|Remux|HDTV|DVDRip|BRRip)-\d+p.*?\]', "[Optimized-$resolution]" `
             -replace '\[x\d+\]|\[x264\]|\[x265\]|\[hevc\]|\[av1\]|\[vc1\]\[vp9\]', "[$($VideoCodec -replace 'lib','')]"
+        if($uploader){$outName = $outName -replace '-[^-]+$', "-$uploader"}
         $outputFile  = Join-Path $OutputDirectory "$outName.mkv"
         if (Test-Path -LiteralPath $outputFile) {
             Write-Verbose "Resolution $resolution already exists: $outputFile"; continue
@@ -482,5 +485,6 @@ foreach ($File in $Files) {
         -AudioCodec $AudioCodec `
         -BitrateMap $bitrateMap `
         -DenyTonemap $DenyTonemap `
-        -AudioToStereo $AudioToStereo
+        -AudioToStereo $AudioToStereo `
+        -uploader $uploader
 }
