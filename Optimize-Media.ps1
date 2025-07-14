@@ -161,7 +161,7 @@ function Get-AutoCrop {
 
     # Ermittel Crop-Parameter der ersten $DetectDuration Sekunden
     $args = @(
-        "-hide_banner", "-ss", "00:01:00", "-t", $DetectDuration,
+        "-hide_banner", "-ss", "00:03:00", "-t", $DetectDuration,
         "-i", $VideoFile, "-vf", "cropdetect",
         "-f", "null", "-"
     )
