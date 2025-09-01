@@ -13,22 +13,29 @@ add_param() {
 }
 
 # Required
-add_param "OriginalPath" "$ORIGINAL_PATH"
-add_param "OptimizedPath" "$OPTIMIZED_PATH"
+add_param "SourcePath" "$SOURCE_PATH"
+add_param "DestPath" "$DEST_PATH"
 
 # Optional
+add_param "TargetFps" "$TARGET_FPS"
+add_param "AllowFpsUpsample" "$ALLOW_FPS_UPSAMPLE"
 add_param "VideoCodec" "$VIDEO_CODEC"
-add_param "AudioCodec" "$AUDIO_CODEC"
-add_param "Bitrate4320p" "$BITRATE_4320P"
-add_param "Bitrate3456p" "$BITRATE_3456P"
-add_param "Bitrate2880p" "$BITRATE_2880P"
-add_param "Bitrate2160p" "$BITRATE_2160P"
-add_param "Bitrate1440p" "$BITRATE_1440P"
-add_param "Bitrate1080p" "$BITRATE_1080P"
-add_param "Bitrate720p" "$BITRATE_720P"
-add_param "Bitrate480p" "$BITRATE_480P"
-add_param "DenyTonemap" "$DENY_TONEMAP"
+add_param "Preset" "$PRESET"
+add_param "VideoBitrate" "$VIDEO_BITRATE"
+add_param "MaxRate" "$MAXRATE"
+add_param "BufSize" "$BUFSIZE"
+add_param "CRF" "$CRF"
+add_param "AudioMode" "$AUDIO_MODE"
+add_param "AudioBitrate" "$AUDIO_BITRATE"
+add_param "MapSubtitles" "$MAP_SUBTITLES"
+add_param "Overwrite" "$OVERWRITE"
+add_param "DryRun" "$DRYRUN"
+add_param "Extensions" "$EXTENSIONS"
+add_param "Suffix" "$SUFFIX"
+add_param "Threads" "$THREADS"
 
 # Run PowerShell script with built params
-eval "pwsh -File '/app/Optimize-Media.ps1' $PARAMS"
-
+while true; do
+  eval "pwsh -File '/app/Optimize-Media.ps1' $PARAMS"
+  sleep $SLEEP_SECONDS
+done
