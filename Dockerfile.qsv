@@ -1,0 +1,19 @@
+# --- Runtime mit QSV ---
+FROM linuxserver/ffmpeg
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # PowerShell
+    apt-transport-https software-properties-common gnupg && \
+    curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" > /etc/apt/sources.list.d/microsoft.list && \
+    apt-get update && apt-get install -y powershell && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# App-Dateien
+WORKDIR /app
+COPY entrypoint.sh .
+COPY Optimize-Media.ps1 .
+RUN chmod +x /app/entrypoint.sh /app/Optimize-Media.ps1
+
+ENTRYPOINT ["/bin/sh","/app/entrypoint.sh"]
