@@ -84,7 +84,7 @@ Param(
   [switch]$AllowFpsUpsample,
 
   [Parameter()][string]$VideoCodec = 'libx264',
-  [Parameter()][string]$Preset = 'medium',
+  [Parameter()][string]$Preset,
 
   [Parameter()][string]$VideoBitrate,   # e.g. '5M'
   [Parameter()][string]$MaxRate,        # e.g. '6M'
@@ -125,11 +125,11 @@ function Get-VideoInfo {
     }
   }
   return [pscustomobject]@{
-    width = $s.width
-    height = $s.height
-    fps = $fps
-    vcodec = $s.codec_name
-    vbitrate = $s.bit_rate
+    width   = $s.width
+    height  = $s.height
+    fps     = $fps
+    vcodec  = $s.codec_name
+    vbitrate= $s.bit_rate
   }
 }
 
