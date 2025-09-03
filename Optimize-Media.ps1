@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   Re-encodes videos recursively with adjustable FPS and bitrate while mirroring the folder structure.
 
@@ -47,6 +47,12 @@
 .PARAMETER MapSubtitles
   Copy subtitle streams if present (default: On). Use -MapSubtitles:$false to disable.
 
+.PARAMETER MergeAudio
+  If set and the file has multiple audio streams, merge/mix them into a single stream via amix.
+
+.PARAMETER NormalizeAudio
+  If set, normalize each audio stream via EBU R128 loudnorm before mapping/merging.
+
 .PARAMETER Overwrite
   Overwrite existing output files. Default: Off (skip existing).
 
@@ -62,18 +68,8 @@
 .PARAMETER Threads
   Optional threads for ffmpeg (-threads). Default: not set (ffmpeg decides).
 
-.EXAMPLE
-  .\Transcode-FpsBitrate.ps1 -SourcePath 'D:\Input' -DestPath 'E:\Output' `
-    -TargetFps 25 -VideoBitrate '5M' -MaxRate '6M' -BufSize '12M' `
-    -VideoCodec h264_nvenc -Preset p5 -Overwrite
-
-.EXAMPLE
-  # Only reduce FPS to 24 if higher; keep audio/subs; use CRF 20 with x265
-  .\Transcode-FpsBitrate.ps1 -SourcePath 'D:\Input' -DestPath 'E:\Out' `
-    -TargetFps 24 -VideoCodec libx265 -CRF 20 -Overwrite
-
 .NOTES
-  Author: htobi02 (adapted by ChatGPT), Version: 1.0
+  Author: htobi02 (adapted by ChatGPT), Version: 1.1 (adds -MergeAudio, -NormalizeAudio)
 #>
 [CmdletBinding()]
 Param(
@@ -97,6 +93,9 @@ Param(
 
   [Parameter()][bool]$MapSubtitles = $true,
 
+  [switch]$MergeAudio,
+  [switch]$NormalizeAudio,
+
   [switch]$Overwrite,
   [switch]$DryRun,
 
@@ -108,7 +107,6 @@ Param(
 function Get-VideoInfo {
   param([Parameter(Mandatory)][string]$Path)
 
-  # JSON probe for fps & width/height and stream bitrates
   $json = & ffprobe -v error -select_streams v:0 `
     -show_entries stream=width,height,avg_frame_rate,codec_name,bit_rate `
     -of json -- "$Path" | ConvertFrom-Json
@@ -116,7 +114,6 @@ function Get-VideoInfo {
   if (-not $json.streams) { return $null }
 
   $s = $json.streams[0]
-  # Parse X/Y fps rational safely
   $fps = $null
   if ($s.avg_frame_rate -and $s.avg_frame_rate -ne '0/0') {
     $parts = $s.avg_frame_rate -split '/'
@@ -133,6 +130,14 @@ function Get-VideoInfo {
   }
 }
 
+function Get-AudioStreamIndices {
+  param([Parameter(Mandatory)][string]$Path)
+  $aj = & ffprobe -v error -select_streams a -show_entries stream=index -of json -- "$Path" | ConvertFrom-Json
+  if (-not $aj.streams) { return @() }
+  # Return the 0-based indices within the input (these are stream numbers, not per-type indexes)
+  return @($aj.streams | ForEach-Object { [int]$_.index })
+}
+
 function Should-ChangeFps {
   param(
     [double]$SourceFps,
@@ -142,7 +147,6 @@ function Should-ChangeFps {
   if ($TargetFps -eq 'copy' -or -not $TargetFps) { return $false }
   $t = [double]$TargetFps
   if (-not $AllowUpsample -and $t -gt $SourceFps) { return $false }
-  # consider a tiny tolerance ~0.01 fps
   return ([math]::Abs($SourceFps - $t) -gt 0.01)
 }
 
@@ -187,6 +191,8 @@ foreach ($f in $files) {
       Write-Host "Skipping (no video stream): $($f.FullName)" -ForegroundColor DarkGray
       continue
     }
+    $aIdx = Get-AudioStreamIndices -Path $f.FullName
+    $aCount = $aIdx.Count
 
     $out = New-OutputPath -InFile $f.FullName -FromRoot $SourcePath -ToRoot $DestPath -Suffix $Suffix
     if (-not (Test-Path -LiteralPath $out.Directory)) {
@@ -198,7 +204,7 @@ foreach ($f in $files) {
       continue
     }
 
-    # Build ffmpeg args as array (avoids quoting hell)
+    # Build ffmpeg args as array
     $args = @("-hide_banner", "-loglevel", "error", "-stats")
     if (-not $Overwrite) { $args += "-n" } else { $args += "-y" }
     $args += @("-i", $f.FullName)
@@ -208,7 +214,6 @@ foreach ($f in $files) {
     if ($TargetFps -ne 'copy' -and $info.fps) {
       $applyFps = Should-ChangeFps -SourceFps $info.fps -TargetFps $TargetFps -AllowUpsample:$AllowFpsUpsample
     }
-
     $vfParts = @()
     if ($applyFps) { $vfParts += "fps=$TargetFps" }
     if ($vfParts.Count -gt 0) {
@@ -216,40 +221,104 @@ foreach ($f in $files) {
     }
 
     # Video codec & rate control
-    $args += @("-c:v", $VideoCodec, "-preset", $Preset)
-
+    $args += @("-c:v", $VideoCodec)
+    if ($Preset) { $args += @("-preset", $Preset) }
     if ($CRF) {
-      # CRF mode: ignore VideoBitrate/MaxRate/BufSize
       $args += @("-crf", "$CRF")
     } elseif ($VideoBitrate) {
       $args += @("-b:v", $VideoBitrate)
       if ($MaxRate) { $args += @("-maxrate", $MaxRate) }
       if ($BufSize) { $args += @("-bufsize", $BufSize) }
     }
-
     if ($Threads -gt 0) { $args += @("-threads", "$Threads") }
 
-    # Audio
-    if ($AudioMode -eq 'copy' -or $AudioMode -eq 'copy:all') {
-      $args += @("-c:a", "copy")
-    } else {
-      $args += @("-c:a", $AudioMode)
-      if ($AudioBitrate) { $args += @("-b:a", $AudioBitrate) }
-      # If multiple audio tracks exist, re-encode all with same settings
+    # --- Audio: normalize / merge filter graph (robust) ---
+    $needsFC = $NormalizeAudio -or ($MergeAudio -and $aCount -gt 1)
+    $filterComplex = $null
+    $audioMapArgs = @()
+
+    if ($needsFC -and $aCount -gt 0) {
+      $fcParts = @()
+      $preLabels = @()
+
+      for ($i = 0; $i -lt $aCount; $i++) {
+        $src = "[0:a:$i]"
+        $mid = "[apre$i]"
+        # Vereinheitlichen: Samplerate/Kanäle für jede Spur
+        if ($NormalizeAudio) {
+          $fcParts += "$src loudnorm=I=-16:TP=-1.5:LRA=11, aresample=async=1:min_hard_comp=0.100:first_pts=0, aformat=sample_rates=48000:channel_layouts=stereo $mid"
+        } else {
+          $fcParts += "$src aresample=async=1:min_hard_comp=0.100:first_pts=0, aformat=sample_rates=48000:channel_layouts=stereo $mid"
+        }
+        $preLabels += $mid
+      }
+
+      if ($MergeAudio -and $aCount -gt 1) {
+        # Alle vereinheitlichten Spuren sauber mischen
+        $fcParts += "$($preLabels -join '') amix=inputs=$($aCount):duration=longest:normalize=1 [aout]"
+        $audioMapArgs += @("-map","[aout]")
+      } else {
+        foreach ($lab in $preLabels) { $audioMapArgs += @("-map",$lab) }
+      }
+
+      $filterComplex = ($fcParts -join ";")
     }
 
-    # Subtitles
-    if ($MapSubtitles) {
-      $args += @("-map", "0", "-map_metadata", "0", "-map_chapters", "0", "-c:s", "copy")
+
+
+    # Subtitles + mapping
+    if ($filterComplex) {
+      $args += @("-filter_complex", $filterComplex)
+
+      # Map video and (optionally) subtitles
+      $args += @("-map","0:v")
+      if ($MapSubtitles) {
+        $args += @("-map","0:s?","-c:s","copy","-map_metadata","0","-map_chapters","0")
+      }
+
+      # Map the filtered audio labels
+      $args += $audioMapArgs
+
+      # Choose audio codec (can't be copy when filters are used)
+      $audioCodecActual = $AudioMode
+      $audioBitrateActual = $AudioBitrate
+      if ($audioCodecActual -eq 'copy' -or $audioCodecActual -eq 'copy:all') {
+        Write-Host "AudioMode 'copy' not possible with Merge/Normalize. Using AAC re-encode." -ForegroundColor Yellow
+        $audioCodecActual = 'aac'
+        if (-not $audioBitrateActual) { $audioBitrateActual = '192k' }
+      }
+      if (-not $audioBitrateActual) { $audioBitrateActual = '192k' }  # sichere Default
+      $args += @(
+        "-c:a", $audioCodecActual,
+        "-b:a", $audioBitrateActual,
+        "-ar", "48000",              # 48 kHz erzwingen
+        "-ac", "2"                   # Stereo erzwingen
+      )
+
     } else {
-      # no subtitle mapping; map all audio+video explicitly
-      $args += @("-map", "0:v", "-map", "0:a?")
+      # No audio filters: behave like before
+      if ($MapSubtitles) {
+        $args += @("-map", "0", "-map_metadata", "0", "-map_chapters", "0", "-c:s", "copy")
+      } else {
+        $args += @("-map", "0:v", "-map", "0:a?")
+      }
+
+      if ($AudioMode -eq 'copy' -or $AudioMode -eq 'copy:all') {
+        $args += @("-c:a", "copy")
+      } else {
+        $args += @("-c:a", $AudioMode)
+        $ab = if ($AudioBitrate) { $AudioBitrate } else { "192k" }
+        $args += @("-b:a", $ab, "-ar", "48000", "-ac", "2")
+      }
     }
+
+    # Muxing Queue
+    $args += @("-max_muxing_queue_size","4096")
 
     # Output path
     $args += @($out.File)
 
-    # Show what we do
+    # Progress
     $desc = "-> $($out.File)  [src fps: {0:N3}{1}]" -f $info.fps, ($(if ($applyFps) { " -> $TargetFps" } else { "" }))
     Write-Host "Processing: $($f.FullName)" -ForegroundColor Green
     Write-Host $desc -ForegroundColor Gray
