@@ -315,6 +315,11 @@ foreach ($f in $files) {
     # Muxing Queue
     $args += @("-max_muxing_queue_size","4096")
 
+    # if hevc-codec set right tags
+    if ($VideoCodec -match "hevc|libx265") {
+      $args += @("-tag:v", "hvc1")
+    }
+
     # Output path
     $args += @($out.File)
 
