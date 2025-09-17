@@ -164,7 +164,8 @@ function New-OutputPath {
   $ext = [System.IO.Path]::GetExtension($out)
   if ($Suffix) { $name = "$name$Suffix" }
   $final = Join-Path $dir "$name$ext"
-  return @{ Directory = $dir; File = $final }
+  $temp = Join-Path $env:TEMP "$name$ext"
+  return @{ Directory = $dir; File = $final; Temp = $temp }
 }
 
 # --- Validations ---
@@ -176,6 +177,10 @@ $mask = $Extensions | ForEach-Object { "*$($_.Trim())" }
 $files = Get-ChildItem -LiteralPath $SourcePath -Recurse -File |
   Where-Object { $Extensions -contains ([System.IO.Path]::GetExtension($_.Name).ToLowerInvariant()) } |
   Sort-Object FullName
+
+# Gather base temp path (Fallback: /tmp)
+$baseTemp = if ($env:TEMP -and $env:TEMP.Trim()) { $env:TEMP } else { '/tmp' }
+New-Item -ItemType Directory -Path $baseTemp -Force -ErrorAction SilentlyContinue | Out-Null
 
 if ($files.Count -eq 0) {
   Write-Host "No matching files under $SourcePath" -ForegroundColor Yellow
@@ -206,7 +211,7 @@ foreach ($f in $files) {
 
     # Build ffmpeg args as array
     $args = @("-hide_banner", "-loglevel", "error", "-stats")
-    if (-not $Overwrite) { $args += "-n" } else { $args += "-y" }
+    $args += "-y"
     $args += @("-i", $f.FullName)
 
     # FPS filter?
@@ -321,10 +326,10 @@ foreach ($f in $files) {
     }
 
     # Output path
-    $args += @($out.File)
+    $args += @($out.temp)
 
     # Progress
-    $desc = "-> $($out.File)  [src fps: {0:N3}{1}]" -f $info.fps, ($(if ($applyFps) { " -> $TargetFps" } else { "" }))
+    $desc = "-> $($out.File) (Temp: $($out.temp))  [src fps: {0:N3}{1}]" -f $info.fps, ($(if ($applyFps) { " -> $TargetFps" } else { "" }))
     Write-Host "Processing: $($f.FullName)" -ForegroundColor Green
     Write-Host $desc -ForegroundColor Gray
 
@@ -334,6 +339,8 @@ foreach ($f in $files) {
       & ffmpeg @args
       if ($LASTEXITCODE -ne 0) {
         Write-Host "ffmpeg failed for: $($f.FullName)" -ForegroundColor Red
+      } else {
+        Move-Item -Path @($out.temp) -Destination $($out.File)
       }
     }
   }
