@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     DE: Konvertiert Videodateien in verschiedene Qualitaetsstufen mit individuell einstellbaren Codecs und Bitraten.
     EN: Converts video files into different quality levels with customizable codecs and bitrates.
