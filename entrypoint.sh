@@ -12,6 +12,11 @@ add_param() {
   fi
 }
 
+add_switch() { # nur Flag setzen, wenn logisch "true"
+  v="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"
+  case "$v" in 1|true|yes|on) PARAMS="$PARAMS -$1" ;; esac
+}
+
 # Required
 add_param "OriginalPath" "$ORIGINAL_PATH"
 add_param "OptimizedPath" "$OPTIMIZED_PATH"
@@ -30,6 +35,7 @@ add_param "Bitrate480p" "$BITRATE_480P"
 add_param "DenyTonemap" "$DENY_TONEMAP"
 add_param "AudioToStereo" "$AUDIO_TO_STEREO"
 add_param "uploader" "$UPLOADER"
+add_switch "SimpleNames" "$SIMPLE_NAMES"
 
 # Debug
 echo "PARAMS: $PARAMS"
