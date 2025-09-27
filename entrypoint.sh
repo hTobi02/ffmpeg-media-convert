@@ -28,7 +28,15 @@ add_param "Bitrate1080p" "$BITRATE_1080P"
 add_param "Bitrate720p" "$BITRATE_720P"
 add_param "Bitrate480p" "$BITRATE_480P"
 add_param "DenyTonemap" "$DENY_TONEMAP"
+add_param "AudioToStereo" "$AUDIO_TO_STEREO"
+add_param "uploader" "$UPLOADER"
+
+# Debug
+echo "PARAMS: $PARAMS"
+sleep 10
 
 # Run PowerShell script with built params
-eval "pwsh -File '/app/Optimize-Media.ps1' $PARAMS"
-
+while true; do
+  eval "pwsh -File '/app/Optimize-Media.ps1' $PARAMS"
+  sleep $SLEEP_SECONDS
+done
