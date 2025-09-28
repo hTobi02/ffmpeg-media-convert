@@ -89,8 +89,8 @@
                          -SimpleNames
 
 .NOTES
-    DE: Autor: github.com/htobi02 - Version: 0.3 - Erstellt: 2025-04-23, Aktualisiert: 2025-09-27
-    EN: Author: github.com/htobi02 - Version: 0.3 - Created: 2025-04-23, Updated: 2025-09-27
+    DE: Autor: github.com/htobi02 - Version: 0.3.1 - Erstellt: 2025-04-23, Aktualisiert: 2025-09-27
+    EN: Author: github.com/htobi02 - Version: 0.3.1 - Created: 2025-04-23, Updated: 2025-09-27
 #>
 Param(
     [parameter(Mandatory=$true)][String[]]$OriginalPath,
@@ -110,6 +110,48 @@ Param(
     [string]$uploader=$null,
     [switch]$SimpleNames
 )
+
+# --- NEW (crop fallback + logging) -------------------------------------------------------------
+$Global:CropErrorLog      = Join-Path $PSScriptRoot 'errors_crop.log'
+$CommonAspectRatios       = @(1.33,1.37,1.43,1.50,1.66,1.75,1.78,1.85,1.90,2.00,2.20,2.35,2.39,2.40,2.76)
+$AspectTolerance          = 0.025 # 2.5% Toleranz
+
+function Test-AspectIsCommon {
+    param(
+        [Parameter(Mandatory)][double]$Ratio,
+        [double[]]$Allowed = $CommonAspectRatios,
+        [double]$Tolerance = $AspectTolerance
+    )
+    foreach ($a in $Allowed) {
+        if ($a -eq 0) { continue }
+        $diff = [math]::Abs(($Ratio - $a) / $a)
+        if ($diff -le $Tolerance) { return $true }
+    }
+    return $false
+}
+
+function Parse-CropWH {
+    param([string]$CropLine)
+    if ($CropLine -match 'crop=(\d+):(\d+):(\d+):(\d+)') {
+        $w = [int]$Matches[1]; $h = [int]$Matches[2]
+        $x = [int]$Matches[3]; $y = [int]$Matches[4]
+        $r = if ($h -gt 0) { [math]::Round($w / $h, 3) } else { 0 }
+        return @{ w=$w; h=$h; x=$x; y=$y; ratio=$r }
+    }
+    return $null
+}
+
+function Write-CropErrorLog {
+    param(
+        [Parameter(Mandatory)][object]$InputFile,
+        [Parameter(Mandatory)][string]$Reason,
+        [string]$Details
+    )
+    $ts = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+    $line = "$ts | $($InputFile.FullName) | $Reason | $Details"
+    Add-Content -Path $Global:CropErrorLog -Value $line
+}
+# -----------------------------------------------------------------------------------------------
 
 function Test-IsHDR {
     param (
@@ -158,30 +200,77 @@ function Test-DoVi {
     if ($dvData) { return $dvData } else { return $false }
 }
 
+# --- REWORKED: Auto-crop with aspect fallback attempts -----------------------------------------
 function Get-AutoCrop {
     param (
         [Parameter(Mandatory=$true)]
         [string]$VideoFile,
-        [int]$DetectDuration = 60
+        [int]$DetectDuration = 60,
+        [string]$StartOffset = '00:03:00',
+        [int]$ShiftAttempts = 3,
+        [int]$ShiftStepMinutes = 10,
+        [double[]]$AllowedRatios,
+        [double]$Tolerance
     )
+
     if (-Not (Test-Path -LiteralPath $VideoFile)) {
         Write-Host "Video File not found for crop detection: $VideoFile" -ForegroundColor Yellow
-        return ""
+        return [PSCustomObject]@{ Crop=$null; Ratio=$null; Accepted=$false; AttemptCount=0; Attempts='file missing'; Message='file not found' }
     }
 
-    $args = @(
-        "-hide_banner", "-ss", "00:03:00", "-t", $DetectDuration,
-        "-i", $VideoFile, "-vf", "cropdetect",
-        "-f", "null", "-"
-    )
-    $output = & ffmpeg @args 2>&1
+    if (-not $AllowedRatios) { $AllowedRatios = $CommonAspectRatios }
+    if (-not $Tolerance)     { $Tolerance     = $AspectTolerance }
 
-    $cropLine = ($output |
-        Select-String -Pattern "crop=\d+:\d+:\d+:\d+" |
-        ForEach-Object { $_.Matches.Value })[-1]
+    Write-Verbose "[AutoCrop] StartOffset=$StartOffset, Attempts=$ShiftAttempts, Step=${ShiftStepMinutes}m, DetectDuration=${DetectDuration}s"
 
-    return $cropLine
+    function Invoke-CropDetect([string]$offset) {
+        $args = @(
+            '-hide_banner','-ss',$offset,'-t',$DetectDuration,
+            '-i',$VideoFile,'-vf','cropdetect','-f','null','-'
+        )
+        & ffmpeg @args 2>&1
+    }
+
+    $attemptNotes = @()
+    $startSec = [TimeSpan]::Parse($StartOffset).TotalSeconds
+
+    for ($i=0; $i -le $ShiftAttempts; $i++) {
+        $offSec = [int]$startSec + ($i * $ShiftStepMinutes * 60)
+        $off    = [TimeSpan]::FromSeconds($offSec).ToString()
+        Write-Verbose "[AutoCrop] Attempt #$i at offset $off"
+
+        $output  = Invoke-CropDetect -offset $off
+        $cropLine = ($output |
+            Select-String -Pattern 'crop=\d+:\d+:\d+:\d+' |
+            ForEach-Object { $_.Matches.Value })[-1]
+
+        if (-not $cropLine) {
+            $attemptNotes += "no crop at $off"
+            continue
+        }
+
+        $parsed = Parse-CropWH -CropLine $cropLine
+        if (-not $parsed) {
+            $attemptNotes += "no crop match at $off"
+            continue
+        }
+
+        $ok = Test-AspectIsCommon -Ratio $parsed.ratio -Allowed $AllowedRatios -Tolerance $Tolerance
+        Write-Verbose "[AutoCrop] Detected ${($parsed.w)}x${($parsed.h)} (AR=$($parsed.ratio)); common=$ok"
+
+        if ($ok) {
+            return [PSCustomObject]@{ Crop=$cropLine; Ratio=$parsed.ratio; Accepted=$true; Attempt=$i; Offset=$off }
+        } else {
+            $attemptNotes += "AR=$($parsed.ratio) at $off"
+        }
+    }
+
+    return [PSCustomObject]@{
+        Crop=$null; Ratio=$null; Accepted=$false; AttemptCount=($ShiftAttempts+1);
+        Attempts=($attemptNotes -join '; '); Message='No common aspect ratio detected via cropdetect'
+    }
 }
+# -----------------------------------------------------------------------------------------------
 
 function Convert-BitrateToBps {
     param (
@@ -365,13 +454,22 @@ function Convert-Video {
         } else { $tonemapFilter = ''; $optimizedName = $InputFile.BaseName }
     } else { $tonemapFilter = ''; $optimizedName = $InputFile.BaseName }
 
-    # --- AutoCrop ---
-    $cropParams = Get-AutoCrop -VideoFile "$($InputFile.FullName)" -DetectDuration 5
-    Write-Verbose "Crop Params: $cropParams"
-    if ($cropParams) { $cropFilter = "$cropParams," } else { $cropFilter = '' }
+    # --- AutoCrop with aspect fallback ---
+    $cropResult = Get-AutoCrop -VideoFile "$($InputFile.FullName)" -DetectDuration 5 -StartOffset '00:03:00' -ShiftAttempts 3 -ShiftStepMinutes 10
+
+    if ($cropResult.Accepted) {
+        Write-Verbose "Using crop '$($cropResult.Crop)' (AR=$($cropResult.Ratio)) from attempt #$($cropResult.Attempt)"
+        $cropParams = $cropResult.Crop
+        $cropFilter = "$cropParams,"
+    } else {
+        Write-Warning "Auto-crop failed to find common AR. Skipping transcode for '$($InputFile.Name)'."
+        Write-CropErrorLog -InputFile $InputFile -Reason 'AutoCrop failed' -Details $cropResult.Attempts
+        return
+    }
 
     # --- Source width ---
-    $videoStream = & ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$($InputFile.FullName)"
+    $videoStream = & ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 "$(
+        $InputFile.FullName)"
     $parts       = $videoStream -split ","
     $videoWidth  = [int]$parts[0]
 
@@ -447,7 +545,6 @@ function Convert-Video {
     }
 
     # --- Filter complex ---
-    # Build video chain cleanly (no stray spaces/commas)
     $videoChain = @()
     if ($cropParams)   { $videoChain += $cropParams }
     if ($tonemapFilter){ $videoChain += $tonemapFilter.TrimEnd(',') }
@@ -467,7 +564,6 @@ function Convert-Video {
     $filterComplex = ($fcParts -join ';')
 
     # --- ffmpeg command ---
-    # Build args array (robust against quoting issues)
     $args = @(
         '-hide_banner','-loglevel','error','-n','-stats',
         '-i', $InputFile.FullName,
@@ -476,7 +572,7 @@ function Convert-Video {
 
     for ($i = 1; $i -le $splitCount; $i++) {
         $out = $Outputs | Where-Object { $_.id -eq $i }
-        $args += @('-map', "[v${i}out]", '-c:v', $VideoCodec, '-b:v', "$($out.bitrate)")
+        $args += @('-map', "[v${i}out]", '-c:v', $VideoCodec, '-b:v', "$(($out.bitrate))")
 
         $si = 0
         foreach ($lang in $audioLabels.Keys) {
@@ -486,7 +582,6 @@ function Convert-Video {
         }
 
         if ($audioLabels.Count -eq 0) {
-            # No audio filters/labels → map input audio if present
             $args += @('-map', '0:a?')
         }
 
