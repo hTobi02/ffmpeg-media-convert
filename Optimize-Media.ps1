@@ -101,7 +101,13 @@ Param(
 
   [string[]]$Extensions = @('.mkv','.mp4','.m4v','.avi','.mov','.webm'),
   [string]$Suffix = '',
-  [int]$Threads
+  [int]$Threads,
+  [Parameter()][ValidateSet('off','hable','mobius','reinhard','bt2390','linear','gamma','clip')][string]$TonemapMode = 'off',
+  [Parameter()][int]$TonemapPeakNits = 100,
+  [Parameter()][double]$TonemapParam,
+  [Parameter()][double]$TonemapDesat,
+  [Parameter()][ValidateSet('bt709','srgb','bt1886')][string]$TonemapTargetTrc = 'bt709',
+  [switch]$ForceTonemap
 )
 
 # ---- Verbose standardmäßig aktivieren (nur Skript-Scope) ----
@@ -139,7 +145,7 @@ function Get-VideoInfo {
   Write-Verbose "[ffprobe] Query video stream info: $Path"
 
   $jsonRaw = & ffprobe -v error -select_streams v:0 `
-    -show_entries stream=width,height,avg_frame_rate,codec_name,bit_rate `
+    -show_entries stream=width,height,avg_frame_rate,codec_name,bit_rate,color_space,color_transfer,color_primaries `
     -of json -- "$Path"
 
   if (-not $jsonRaw) {
@@ -174,6 +180,9 @@ function Get-VideoInfo {
     fps      = $fps
     vcodec   = $s.codec_name
     vbitrate = $s.bit_rate
+    cspace   = $s.color_space
+    transfer = $s.color_transfer
+    cprim    = $s.color_primaries
   }
 }
 
@@ -320,6 +329,36 @@ foreach ($f in $files) {
       Write-Verbose "[VF] Final -vf: $vfJoined"
     } else {
       Write-Verbose "[VF] No video filter chain."
+    }
+
+    # --- HDR → SDR Tonemapping (zscale + tonemap) -----------------------------
+    $isHdr = $false
+    if ($info -and $info.transfer) {
+      $hdrTransfers = @('smpte2084','arib-std-b67','pq')
+      $isHdr = $hdrTransfers -contains ($info.transfer.ToLowerInvariant())
+    }
+    Write-Verbose ("[TM] Source transfer='{0}', HDR? {1}" -f $info.transfer,$isHdr)
+
+    if ($TonemapMode -ne 'off' -and ($isHdr -or $ForceTonemap)) {
+      $vfParts += "zscale=t=linear:npl=$TonemapPeakNits"
+      $vfParts += "format=gbrpf32le"
+
+      $tm = "tonemap=tonemap=$TonemapMode"
+      if ($PSBoundParameters.ContainsKey('TonemapParam')) { $tm += ":param=$TonemapParam" }
+      if ($PSBoundParameters.ContainsKey('TonemapDesat')) { $tm += ":desat=$TonemapDesat" }
+      $vfParts += $tm
+      Write-Verbose "[TM] tonemap chain: $tm"
+
+      $vfParts += "zscale=t=$TonemapTargetTrc:m=bt709:r=tv"
+      $vfParts += "format=yuv420p"
+
+      Write-Verbose ("[TM] Applied tonemap='{0}', npl={1}, targetTRC={2}" -f $TonemapMode,$TonemapPeakNits,$TonemapTargetTrc)
+    } else {
+      if ($TonemapMode -ne 'off') {
+        Write-Verbose "[TM] Tonemap requested but source not HDR (and -ForceTonemap not set) → skipping."
+      } else {
+        Write-Verbose "[TM] Tonemap disabled."
+      }
     }
 
     # Video codec & rate control
